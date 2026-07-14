@@ -298,10 +298,13 @@
         if (worldData) {
             context.beginPath();
             path(worldData);
-            context.fillStyle = isNight ? '#1e3a1e' : '#e2e8f0'; // Diubah agak netral agar pin ungu terlihat kontras
+            
+            // Warna daratan: hijau natural saat siang, hijau gelap saat malam
+            context.fillStyle = isNight ? '#1e3a1e' : '#4ade80'; 
             context.fill();
             
-            context.strokeStyle = isNight ? '#0f172a' : '#ffffff';
+            // Garis batas negara: hijau tua saat siang, biru navy pekat saat malam
+            context.strokeStyle = isNight ? '#0f172a' : '#166534'; 
             context.lineWidth = 0.6;
             context.stroke();
         }
