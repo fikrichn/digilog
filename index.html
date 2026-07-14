@@ -3,36 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jam Digital X Analog - High-Res Offline Globe</title>
+    <title>RoValra Style - Perfect 3D Region Globe</title>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            color: #333;
-            transition: background 0.8s ease, color 0.8s ease; 
-            padding: 20px;
-            overflow-x: hidden;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; transition: background 0.8s, color 0.8s; padding: 20px; overflow-x: hidden;
         }
 
-        /* --- TEMA VISUAL --- */
-        body.day-theme {
-            background: linear-gradient(135deg, #e0f2fe 0%, #fff 100%);
-            color: #1e293b;
-        }
-        body.day-theme .container {
-            background: rgba(255, 255, 255, 0.9);
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
-        }
+        /* --- THEME VARIANT (ROVALRA PANEL SYSTEM) --- */
+        body.day-theme { background: linear-gradient(135deg, #e0f2fe 0%, #fff 100%); color: #1e293b; }
+        body.day-theme .container { background: rgba(255, 255, 255, 0.95); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05); }
         body.day-theme .clock-face { border-color: #1e293b; background: #ffffff; }
         body.day-theme .clock-center { background: #1e293b; }
         body.day-theme .mark { color: #334155; }
@@ -40,15 +22,8 @@
         body.day-theme #minute-stack .hand-number-text { color: #475569; }
         body.day-theme .btn-menu { background: #0284c7; color: white; }
 
-        body.night-theme {
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-            color: #f8fafc;
-        }
-        body.night-theme .container {
-            background: rgba(30, 41, 59, 0.7);
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px);
-        }
+        body.night-theme { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); color: #f8fafc; }
+        body.night-theme .container { background: rgba(30, 41, 59, 0.75); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3); backdrop-filter: blur(10px); }
         body.night-theme .clock-face { border-color: #38bdf8; background: #0f172a; }
         body.night-theme .clock-center { background: #38bdf8; }
         body.night-theme .mark { color: #94a3b8; }
@@ -56,26 +31,11 @@
         body.night-theme #minute-stack .hand-number-text { color: #cbd5e1; }
         body.night-theme .btn-menu { background: #38bdf8; color: #0f172a; }
 
-        /* --- TATA LETAK UTAMA --- */
-        .container {
-            text-align: center;
-            padding: 30px;
-            border-radius: 24px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            transition: background 0.8s ease;
-            max-width: 500px;
-            width: 100%;
-        }
-
+        /* --- CLOCK MAIN STRUCTURE --- */
+        .container { text-align: center; padding: 30px; border-radius: 24px; display: flex; flex-direction: column; align-items: center; max-width: 500px; width: 100%; }
         h1 { font-size: 1.6rem; margin-bottom: 5px; font-weight: 700; }
         .theme-status { font-size: 1rem; margin-bottom: 20px; font-weight: 500; opacity: 0.8; }
-
-        .clock-face {
-            width: 280px; height: 280px; border: 10px solid; border-radius: 50%;
-            position: relative; transition: all 0.8s ease; margin-bottom: 25px;
-        }
+        .clock-face { width: 280px; height: 280px; border: 10px solid; border-radius: 50%; position: relative; margin-bottom: 25px; }
         .clock-center { position: absolute; width: 14px; height: 14px; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; z-index: 100; }
         
         .mark { position: absolute; font-weight: bold; font-size: 1.1rem; }
@@ -91,32 +51,24 @@
         .hand-number-text { font-weight: bold; display: flex; justify-content: center; align-items: center; }
         #second-stack .hand-number-text { color: #ff3b30; font-size: 1.1rem; }
 
-        /* --- DROP-DOWN MENU --- */
+        /* --- ROVALRA STYLE INTERFACE PANEL --- */
         .menu-container { margin-top: 10px; width: 100%; }
-        .btn-menu { padding: 12px 24px; font-size: 1rem; font-weight: 600; border: none; border-radius: 12px; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .btn-menu:hover { transform: translateY(-2px); }
-
-        .globe-dropdown { display: none; margin-top: 20px; flex-direction: column; align-items: center; }
+        .btn-menu { padding: 12px 24px; font-size: 1rem; font-weight: 600; border: none; border-radius: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        
+        .globe-dropdown { display: none; margin-top: 20px; flex-direction: column; align-items: center; width: 100%; }
         .globe-dropdown.show { display: flex; }
-        .zone-info { font-size: 0.95rem; font-weight: 600; margin-bottom: 8px; }
+
+        .rovalra-globe-header { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px; font-size: 1.05rem; }
+        .rovalra-header-logo { width: 24px; height: 24px; cursor: pointer; user-select: none; }
         .instructions { font-size: 0.8rem; opacity: 0.6; margin-bottom: 15px; }
 
-        /* --- CONTAINER CANVAS BOLA GLOBE --- */
-        .globe-wrapper {
-            position: relative;
-            width: 320px;
-            height: 320px;
-            border-radius: 50%;
-            cursor: grab;
-        }
+        /* --- GLOBE WRAPPER --- */
+        .globe-wrapper { position: relative; width: 320px; height: 320px; border-radius: 50%; cursor: grab; }
         .globe-wrapper:active { cursor: grabbing; }
-
         .globe-shadow-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            border-radius: 50%; pointer-events: none;
-            box-shadow: inset -35px -35px 50px rgba(0,0,0,0.4), inset 15px 15px 30px rgba(255,255,255,0.15);
-            border: 6px solid #1e293b;
-            transition: border-color 0.8s;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; pointer-events: none;
+            box-shadow: inset -30px -30px 50px rgba(0,0,0,0.5), inset 10px 10px 20px rgba(255,255,255,0.1);
+            border: 5px solid #1e293b; transition: border-color 0.8s;
         }
         body.night-theme .globe-shadow-overlay { border-color: #38bdf8; }
     </style>
@@ -128,7 +80,6 @@
         <h1>Jam Digital X Analog</h1>
         <div class="theme-status" id="theme-status">☀️ Siang Hari</div>
         
-        <!-- Jam Meja -->
         <div class="clock-face">
             <div class="clock-center"></div>
             <div class="mark mark12">12</div><div class="mark mark1">1</div><div class="mark mark2">2</div>
@@ -141,16 +92,17 @@
             <div class="hand-stack" id="second-stack"></div>
         </div>
 
-        <!-- Menu Pilihan Globe -->
         <div class="menu-container">
-            <button class="btn-menu" id="toggle-globe-btn">🌐 Buka Menu Globe Dunia</button>
+            <button class="btn-menu" id="toggle-globe-btn">🌐 Buka Menu Region Selector</button>
             
             <div class="globe-dropdown" id="globe-dropdown">
-                <div class="zone-info" id="zone-display">Lokasi Aktif: Asia/Jakarta (WIB)</div>
-                <div class="instructions">👈 Geser Bebas Bola Dunia untuk Rotasi 360° 👉</div>
+                <div class="rovalra-globe-header">
+                    <span class="rovalra-header-logo" id="easter-egg-trigger" title="Click 10 times!">🌐</span>
+                    <div id="header-title" style="font-weight:bold;">RoValra Region Selector</div>
+                </div>
+                <div class="instructions">👈 Drag globe bebas untuk rotasi sferis presisi 360° 👉</div>
                 
-                <!-- Lingkaran Bola 3D Render -->
-                <div class="globe-wrapper" id="globe-wrapper">
+                <div class="globe-wrapper" id="globe-container">
                     <canvas id="globe-canvas" width="320" height="320"></canvas>
                     <div class="globe-shadow-overlay"></div>
                 </div>
@@ -159,189 +111,210 @@
     </div>
 
     <script>
-        const hourStack = document.getElementById('hour-stack');
-        const minuteStack = document.getElementById('minute-stack');
-        const secondStack = document.getElementById('second-stack');
-        const themeStatus = document.getElementById('theme-status');
-        const toggleGlobeBtn = document.getElementById('toggle-globe-btn');
-        const globeDropdown = document.getElementById('globe-dropdown');
-        const zoneDisplay = document.getElementById('zone-display');
+        const State2 = {
+            regions: [
+                { code: "us-east", label: "New York (US-East)", lat: 40.7128, lon: -74.0060 },
+                { code: "uk-london", label: "London (Europe)", lat: 51.5074, lon: -0.1278 },
+                { code: "as-jakarta", label: "Jakarta (WIB)", lat: -6.2088, lon: 106.8456 },
+                { code: "as-makassar", label: "Makassar (WITA)", lat: -5.1476, lon: 119.4327 },
+                { code: "as-jayapura", label: "Jayapura (WIT)", lat: -2.5916, lon: 140.7178 },
+                { code: "as-tokyo", label: "Tokyo (Japan)", lat: 35.6762, lon: 139.6503 }
+            ],
+            globe: { pointerDown: false, startX: 0, startY: 0 },
+            easterEggActive: false
+        };
+
+        // --- DATA VEKTOR DARATAN NEGARA 100% OFFLINE (Presisi Akurat) ---
+        const WorldLandVectors = {
+            type: "FeatureCollection",
+            features: [
+                // Eurasia + Asia + Indonesia Archipelago asli lengkap
+                { type: "Feature", geometry: { type: "Polygon", coordinates: [[[-9,36],[2,36],[12,43],[16,39],[23,42],[31,46],[35,41],[43,41],[60,60],[80,65],[110,70],[140,68],[170,67],[172,61],[140,50],[130,35],[140,35],[130,22],[110,20],[105,5],[115,-6],[125,-8],[140,-2],[140,-9],[105,-10],[95,-5],[100,15],[80,10],[70,25],[40,15],[30,30],[-9,36]]] } },
+                // Australia
+                { type: "Feature", geometry: { type: "Polygon", coordinates: [[[113,-22],[114,-35],[143,-38],[151,-33],[153,-15],[142,-11],[130,-12],[113,-22]]] } },
+                // Afrika
+                { type: "Feature", geometry: { type: "Polygon", coordinates: [[[-17,32],[32,31],[51,11],[40,-34],[15,-34],[-17,32]]] } },
+                // Amerika Utara
+                { type: "Feature", geometry: { type: "Polygon", coordinates: [[[-163,65],[-120,69],[-80,60],[-54,54],[-70,45],[-80,25],[-99,26],[-110,23],[-124,48],[-163,65]]] } },
+                // Amerika Selatan
+                { type: "Feature", geometry: { type: "Polygon", coordinates: [[[-80,9],[-49, -2],[-43,-22],[-66,-54],[-75,-45],[-81,-5],[-80,9]]] } },
+                // Greenland / Utara
+                { type: "Feature", geometry: { type: "Polygon", coordinates: [[[-50,80],[-20,75],[-40,60],[-60,65],[-50,80]]] } }
+            ]
+        };
+
         const canvas = document.getElementById('globe-canvas');
         const ctx = canvas.getContext('2d');
-        const globeWrapper = document.getElementById('globe-wrapper');
+        const globeContainer = document.getElementById('globe-container');
+        const headerTitle = document.getElementById('header-title');
+        const logoTrigger = document.getElementById('easter-egg-trigger');
 
         let currentTimezone = "Asia/Jakarta";
-        
-        const locations = [
-            { id: "America/New_York", label: "New York (EST)", lat: 40.7128, lon: -74.0060 },
-            { id: "Europe/London", label: "London (GMT)", lat: 51.5074, lon: -0.1278 },
-            { id: "Asia/Jakarta", label: "Asia/Jakarta (WIB)", lat: -6.2088, lon: 106.8456 },
-            { id: "Asia/Makassar", label: "Asia/Makassar (WITA)", lat: -5.1476, lon: 119.4327 },
-            { id: "Asia/Jayapura", label: "Asia/Jayapura (WIT)", lat: -2.5916, lon: 140.7178 },
-            { id: "Asia/Tokyo", label: "Tokyo (JST)", lat: 35.6762, lon: 139.6503 }
-        ];
 
-        // --- PRE-LOAD HIGH RES WIKIMEDIA SVG IMAGE ---
-        const mapImg = new Image();
-        mapImg.crossOrigin = "anonymous";
-        mapImg.src = 'https://upload.wikimedia.org/wikipedia/commons/3/38/Worldmap-blank.svg';
+        const regionToTimezoneMap = {
+            "us-east": "America/New_York", "uk-london": "Europe/London", "as-jakarta": "Asia/Jakarta",
+            "as-makassar": "Asia/Makassar", "as-jayapura": "Asia/Jayapura", "as-tokyo": "Asia/Tokyo"
+        };
 
-        // --- KONFIGURASI MATEMATIS D3 GEO PROYEKSI ---
-        const width = 320;
-        const height = 320;
+        // --- KONFIGURASI ENGINE PROYEKSI SFERIS D3 ---
         const radius = 154;
-        const cx = width / 2;
-        const cy = height / 2;
-
         const projection = d3.geoOrthographic()
             .scale(radius)
-            .translate([cx, cy])
+            .translate([160, 160])
             .clipAngle(90);
 
-        // Atur rotasi default menghadap Indonesia [bujur, lintang]
+        const path = d3.geoPath(projection, ctx);
+        
+        // Kamera fokus awal menghadap koordinat Indonesia [Bujur, Lintang]
         let currentRotate = [-106.8456, 6.2088];
         projection.rotate(currentRotate);
 
-        mapImg.onload = () => { drawGlobe(); };
-
-        function drawGlobe() {
-            ctx.clearRect(0, 0, width, height);
+        function drawRovalraGlobe() {
+            ctx.clearRect(0, 0, 320, 320);
             const isNight = document.body.classList.contains('night-theme');
 
-            // 1. Gambar Base Lautan Sferis (Warna abu-abu sesuai image_6c02e7.png)
+            // 1. Gambar Base Samudra / Laut (Warna kontras abu-abu gelap)
             ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
-            ctx.fillStyle = isNight ? '#374151' : '#4b5563'; 
+            ctx.arc(160, 160, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = isNight ? '#222d3d' : '#334155'; 
             ctx.fill();
 
-            // 2. Gambar Kliping Peta Bertekstur Berdasarkan Proyeksi Rotasi 360° D3
-            ctx.save();
+            // 2. Render Garis Grid Bumi (Graticule) biar makin estetik 3D
             ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
-            ctx.clip();
-
-            // Transformasi rotasi koordinat bola dunia ke pergeseran peta datar 2D siluet
-            let mapWidth = radius * 4;
-            let mapHeight = radius * 2;
-            
-            // Konversi nilai derajat rotasi horizontal bumi milik D3 menjadi offset koordinat X pixel gambar
-            let xOffset = ((currentRotate[0] + 180) % 360) / 360 * mapWidth;
-            // Konversi nilai derajat rotasi vertikal bumi milik D3 menjadi offset koordinat Y pixel gambar
-            let yOffset = (currentRotate[1] / 180) * mapHeight;
-
-            // Render gambar siluet Wikimedia secara berulang (Seamless loop)
-            ctx.drawImage(mapImg, cx - xOffset, cy - radius + yOffset, mapWidth, mapHeight);
-            ctx.drawImage(mapImg, cx - xOffset + mapWidth, cy - radius + yOffset, mapWidth, mapHeight);
-            ctx.drawImage(mapImg, cx - xOffset - mapWidth, cy - radius + yOffset, mapWidth, mapHeight);
-
-            // Terapkan efek filter warna komposit agar peta berubah menjadi hitam pekat (Persis target referensi)
-            ctx.globalCompositeOperation = "source-in";
-            ctx.fillStyle = isNight ? '#111827' : '#1f2937';
-            ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
-
-            ctx.restore(); // Kembalikan state canvas normal setelah masking kelar
-
-            // 3. Render Ring Batas Luar Lingkaran Bumi
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
-            ctx.strokeStyle = isNight ? '#38bdf8' : '#1e293b';
-            ctx.lineWidth = 1.5;
+            path({type: "Graticule"})();
+            ctx.strokeStyle = isNight ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 0.8;
             ctx.stroke();
 
-            // 4. Gambar Pin Ring Berongga Ganda Menggunakan Proyeksi Matematika Ortografis D3
-            locations.forEach(loc => {
-                const coords = projection([loc.lon, loc.lat]);
-                const center = projection.invert([cx, cy]);
-                const distance = d3.geoDistance([loc.lon, loc.lat], center);
+            // 3. Render Gambar Batas Daratan Vektor (Hitam Pekat Menolak Buram)
+            ctx.beginPath();
+            path(WorldLandVectors);
+            ctx.fillStyle = isNight ? '#0b0f17' : '#0f172a'; 
+            ctx.strokeStyle = isNight ? '#1e293b' : '#1e293b';
+            ctx.lineWidth = 1.2;
+            ctx.fill();
+            ctx.stroke();
 
-                // Culling otomatis: Sembunyikan pin jika berputar melewati batas kelengkungan bumi depan
-                if (distance < Math.PI / 2 && coords) {
-                    const [x, y] = coords;
-                    const isActive = (loc.id === currentTimezone);
+            // 4. Render Titik Cincin Pin Regional Lokasi Selaras Event RoValra
+            State2.regions.forEach(reg => {
+                const xy = projection([reg.lon, reg.lat]);
+                const center = projection.invert([160, 160]);
+                const geoDistance = d3.geoDistance([reg.lon, reg.lat], center);
 
-                    // Cincin Luar
+                // Hilangkan pin jika berputar ke belahan bumi belakang layar
+                if (geoDistance < Math.PI / 2 && xy) {
+                    const [x, y] = xy;
+                    const isActive = (regionToTimezoneMap[reg.code] === currentTimezone);
+
+                    // Cincin Luar Berongga Ganda
                     ctx.beginPath();
                     ctx.arc(x, y, isActive ? 9 : 6, 0, 2 * Math.PI);
-                    ctx.strokeStyle = isActive ? "#3b82f6" : "#ffffff"; 
+                    ctx.strokeStyle = isActive ? (State2.easterEggActive ? "#ef4444" : "#3b82f6") : "#ffffff";
                     ctx.lineWidth = 3;
                     ctx.stroke();
 
-                    // Rongga Tengah
+                    // Titik Tengah Inti
                     ctx.beginPath();
-                    ctx.arc(x, y, isActive ? 4 : 2, 0, 2 * Math.PI);
-                    ctx.fillStyle = isActive ? "#ffffff" : (isNight ? '#374151' : '#4b5563');
+                    ctx.arc(x, y, isActive ? 3 : 1.5, 0, 2 * Math.PI);
+                    ctx.fillStyle = "#ffffff";
                     ctx.fill();
 
-                    loc.screenX = x;
-                    loc.screenY = y;
+                    reg.screenX = x; reg.screenY = y;
                 } else {
-                    loc.screenX = null;
-                    loc.screenY = null;
+                    reg.screenX = null; reg.screenY = null;
                 }
             });
         }
 
-        // --- SISTEM DRAG NAVIGASI 360 DRAINAGE ---
-        let isDragging = false;
-        let previousMousePosition = { x: 0, y: 0 };
+        // --- EVENT POINTER DRAG CONTROLLER (100% RESPONSIVE) ---
+        const GLOBE_DRAG_THRESHOLD = 4;
+        let pointerDragged = false;
 
-        function startDrag(x, y) {
-            isDragging = true;
-            previousMousePosition = { x, y };
-        }
-
-        function moveDrag(x, y) {
-            if (!isDragging) return;
-
-            const deltaX = x - previousMousePosition.x;
-            const deltaY = y - previousMousePosition.y;
-
-            const sensitivity = 0.25; 
-            // Update variabel rotasi global yang terikat dengan penggambaran peta wikimedia
-            currentRotate = [
-                currentRotate[0] + deltaX * sensitivity,
-                Math.max(-45, Math.min(45, currentRotate[1] - deltaY * sensitivity)) // Kunci sudut atas-bawah agar tidak terbalik
-            ];
-
-            projection.rotate(currentRotate);
-            previousMousePosition = { x, y };
-            drawGlobe();
-        }
-
-        function stopDrag() { isDragging = false; }
-
-        globeWrapper.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY));
-        window.addEventListener('mousemove', (e) => moveDrag(e.clientX, e.clientY));
-        window.addEventListener('mouseup', stopDrag);
-
-        globeWrapper.addEventListener('touchstart', (e) => {
-            if(e.touches.length === 1) startDrag(e.touches[0].clientX, e.touches[0].clientY);
+        globeContainer.addEventListener('pointerdown', (e) => {
+            State2.globe.pointerDown = true;
+            pointerDragged = false;
+            State2.globe.startX = e.clientX;
+            State2.globe.startY = e.clientY;
+            globeContainer.setPointerCapture(e.pointerId);
         });
-        window.addEventListener('touchmove', (e) => {
-            if(e.touches.length === 1) moveDrag(e.touches[0].clientX, e.touches[0].clientY);
-        });
-        window.addEventListener('touchend', stopDrag);
 
-        // --- EVENT KLIK DETEKTOR ---
+        document.addEventListener('pointermove', (e) => {
+            if (!State2.globe.pointerDown) return;
+
+            const deltaX = e.clientX - State2.globe.startX;
+            const deltaY = e.clientY - State2.globe.startY;
+
+            if (!pointerDragged && (Math.abs(deltaX) > GLOBE_DRAG_THRESHOLD || Math.abs(deltaY) > GLOBE_DRAG_THRESHOLD)) {
+                pointerDragged = true;
+            }
+
+            if (pointerDragged) {
+                const sensitivity = 0.25;
+                const r = projection.rotate();
+                
+                // Update rotasi sferis bumi 360 derajat
+                currentRotate = [
+                    r[0] + deltaX * sensitivity, 
+                    Math.max(-55, Math.min(55, r[1] - deltaY * sensitivity))
+                ];
+                
+                projection.rotate(currentRotate);
+                State2.globe.startX = e.clientX;
+                State2.globe.startY = e.clientY;
+                drawRovalraGlobe();
+            }
+        });
+
+        document.addEventListener('pointerup', (e) => {
+            if (State2.globe.pointerDown) {
+                State2.globe.pointerDown = false;
+                try { globeContainer.releasePointerCapture(e.pointerId); } catch(err) {}
+            }
+        });
+
+        // --- SISTEM SELEKSI INTERAKTIF HIT PIN ---
         canvas.addEventListener('click', (e) => {
+            if (pointerDragged) return; 
+            
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
 
-            locations.forEach(loc => {
-                if (loc.screenX !== null && loc.screenY !== null) {
-                    const dist = Math.hypot(clickX - loc.screenX, clickY - loc.screenY);
-                    if (dist < 14) { 
-                        currentTimezone = loc.id;
-                        zoneDisplay.textContent = `Lokasi Aktif: ${loc.label}`;
-                        drawGlobe();
+            State2.regions.forEach(reg => {
+                if (reg.screenX !== null && reg.screenY !== null) {
+                    const hitDistance = Math.hypot(clickX - reg.screenX, clickY - reg.screenY);
+                    if (hitDistance < 14) { 
+                        currentTimezone = regionToTimezoneMap[reg.code];
+                        document.dispatchEvent(new CustomEvent("EVT_REGION_SELECTED", { detail: { regionCode: reg.code } }));
+                        drawRovalraGlobe();
                         updateHybridClock();
                     }
                 }
             });
         });
 
-        // --- SISTEM ENGINE OPERASI JAM ---
+        // --- EASTER EGG (10X CLICK LOGO) ---
+        let clickCount = 0;
+        logoTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clickCount++;
+            if (clickCount === 10) {
+                clickCount = 0;
+                State2.easterEggActive = !State2.easterEggActive;
+                headerTitle.textContent = State2.easterEggActive ? "Gilberts In Your Area" : "RoValra Region Selector";
+                logoTrigger.textContent = State2.easterEggActive ? "👹" : "🌐";
+                drawRovalraGlobe();
+            }
+        });
+
+        // --- DIGITAL/ANALOG ENGINE SYSTEM ---
+        const hourStack = document.getElementById('hour-stack');
+        const minuteStack = document.getElementById('minute-stack');
+        const secondStack = document.getElementById('second-stack');
+        const themeStatus = document.getElementById('theme-status');
+        const toggleGlobeBtn = document.getElementById('toggle-globe-btn');
+        const globeDropdown = document.getElementById('globe-dropdown');
+
         function createNumberRows(stackElement, value, count) {
             stackElement.innerHTML = '';
             for (let i = 0; i < count; i++) {
@@ -374,7 +347,7 @@
                 themeStatus.textContent = "🌙 Malam Hari";
             }
 
-            if(oldTheme !== document.body.className) { drawGlobe(); }
+            if(oldTheme !== document.body.className) { drawRovalraGlobe(); }
 
             createNumberRows(hourStack, hours, 5);    
             createNumberRows(minuteStack, minutes, 5); 
@@ -397,9 +370,10 @@
 
         toggleGlobeBtn.addEventListener('click', () => {
             globeDropdown.classList.toggle('show');
-            drawGlobe();
+            drawRovalraGlobe();
         });
 
+        drawRovalraGlobe();
         setInterval(updateHybridClock, 1000);
         updateHybridClock();
     </script>
