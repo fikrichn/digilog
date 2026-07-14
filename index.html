@@ -210,14 +210,13 @@
         mapImg.crossOrigin = "anonymous";
         mapImg.src = 'https://upload.wikimedia.org/wikipedia/commons/3/38/Worldmap-blank.svg';
 
-        let rotationLon = 105; // Fokus awal menghadap Indonesia (Bujur Timur)
+        let rotationLon = 105; // Fokus kamera awal menghadap Indonesia (Bujur Timur)
         const radius = 154;    
         const cx = 160, cy = 160;
 
         let isDragging = false;
         let lastX = 0;
 
-        // Canvas buffer di memori
         const mapCanvas = document.createElement('canvas');
         const mctx = mapCanvas.getContext('2d');
         let mapData = null;
@@ -245,7 +244,7 @@
             const globeImgData = ctx.createImageData(320, 320);
             const data = globeImgData.data;
 
-            // 2. Pemetaan Piksel 3D Murni (Utara di Atas, Selatan di Bawah)
+            // 2. Pemetaan Piksel 3D Akurat (FIXED: UN-MIRRORED)
             for (let y = 0; y < 320; y++) {
                 const dy = y - cy;
                 for (let x = 0; x < 320; x++) {
@@ -256,15 +255,16 @@
                         const ny = dy / radius;
                         const nz = Math.sqrt(1 - nx * nx - ny * ny);
 
-                        // PERBAIKAN: Formula Lintang Terbalik (-ny agar Utara tetap di atas)
+                        // Lintang murni (Utara atas, Selatan bawah)
                         const latVal = Math.asin(-ny);
+                        
+                        // FIX: Ditambah (+) agar orientasi peta bumi lurus murni dan TIDAK KE-MIRROR
                         const lonVal = Math.atan2(nx, nz);
 
                         const geoLat = latVal * 180 / Math.PI;
-                        // Menggunakan pengurangan agar arah geser (drag) sinkron dan alami
-                        let geoLon = rotationLon - (lonVal * 180 / Math.PI);
+                        let geoLon = (lonVal * 180 / Math.PI) + rotationLon;
                         
-                        // Normalisasi 360 Derajat Non-Limit Seamless Loop
+                        // Normalisasi putaran tak terbatas
                         geoLon = ((geoLon + 180) % 360 + 360) % 360 - 180;
 
                         const mapX = Math.floor(((geoLon + 180) / 360) * 720);
@@ -280,9 +280,9 @@
 
                             if (r > 100 && g > 100 && b > 100) {
                                 if (isNight) {
-                                    r = 20; g = 50; b = 30; // Daratan Malam
+                                    r = 20; g = 50; b = 30; // Malam
                                 } else {
-                                    r = 76; g = 175; b = 80; // Daratan Siang
+                                    r = 76; g = 175; b = 80; // Siang
                                 }
                             } else {
                                 r = isNight ? 56 : 30;
@@ -300,14 +300,14 @@
             }
             ctx.putImageData(globeImgData, 0, 0);
 
-            // 3. Proyeksi Pin Lokasi 3D Sinkron Berdasarkan Sudut Rotasi Baru
+            // 3. Proyeksi Pin Lokasi 3D Sinkron (FIXED: UN-MIRRORED)
             locations.forEach(loc => {
                 const radLat = loc.lat * Math.PI / 180;
-                // Selisih jarak bujur murni dari rotasi pusat kamera muka bumi
-                const radLon = (rotationLon - loc.lon) * Math.PI / 180;
+                // FIX: Menyesuaikan arah bujur kamera normal un-mirrored
+                const radLon = (loc.lon - rotationLon) * Math.PI / 180;
 
                 const px = radius * Math.cos(radLat) * Math.sin(radLon);
-                const py = -radius * Math.sin(radLat); // Tetap minus karena orientasi koordinat canvas Y ke bawah
+                const py = -radius * Math.sin(radLat);
                 const pz = Math.cos(radLat) * Math.cos(radLon);
 
                 if (pz > 0) {
@@ -315,11 +315,11 @@
                     ctx.arc(cx + px, cy + py, loc.id === currentTimezone ? 10 : 7, 0, 2 * Math.PI);
                     
                     if (loc.id === currentTimezone) {
-                        ctx.fillStyle = "#a855f7"; // Ungu Menyala Glow
+                        ctx.fillStyle = "#a855f7"; 
                         ctx.shadowColor = "#c084fc";
                         ctx.shadowBlur = 15;
                     } else {
-                        ctx.fillStyle = "#ef4444"; // Merah Kontras
+                        ctx.fillStyle = "#ef4444"; 
                         ctx.shadowBlur = 0;
                     }
                     ctx.strokeStyle = "#ffffff";
@@ -369,7 +369,7 @@
             tooltip.style.display = "none";
         });
 
-        // --- INTERAKSI GESER (DRAG) 360° NON-LIMIT ---
+        // --- INTERAKSI GESER (DRAG) 360° NON-LIMIT SINKRON ---
         function startDrag(x) { 
             isDragging = true; 
             lastX = x; 
@@ -379,10 +379,10 @@
             if (!isDragging) return;
             let deltaX = x - lastX;
             
-            // Sensitivitas geser alami, merubah nilai bujur kamera secara kontinu
-            rotationLon += deltaX * 0.4; 
+            // FIX: Diganti pengurangan (-) agar arah geser tangan natural mengikuti arah putaran bola
+            rotationLon -= deltaX * 0.4; 
             
-            // Memastikan putaran membungkus angka tanpa batas batasan derajat murni
+            // Putaran tak terbatas murni
             rotationLon = (rotationLon % 360 + 360) % 360;
             
             lastX = x;
