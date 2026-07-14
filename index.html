@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jam Digital X Analog - High-Res Offline Globe</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: #333;
+            transition: background 0.8s ease, color 0.8s ease; 
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        /* --- TEMA VISUAL --- */
+        body.day-theme {
+            background: linear-gradient(135deg, #e0f2fe 0%, #fff 100%);
+            color: #1e293b;
+        }
+        body.day-theme .container {
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+        }
+        body.day-theme .clock-face { border-color: #1e293b; background: #ffffff; }
+        body.day-theme .clock-center { background: #1e293b; }
+        body.day-theme .mark { color: #334155; }
+        body.day-theme #hour-stack .hand-number-text { color: #0f172a; }
+        body.day-theme #minute-stack .hand-number-text { color: #475569; }
+        body.day-theme .btn-menu { background: #0284c7; color: white; }
+
+        body.night-theme {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: #f8fafc;
+        }
+        body.night-theme .container {
+            background: rgba(30, 41, 59, 0.7);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+        body.night-theme .clock-face { border-color: #38bdf8; background: #0f172a; }
+        body.night-theme .clock-center { background: #38bdf8; }
+        body.night-theme .mark { color: #94a3b8; }
+        body.night-theme #hour-stack .hand-number-text { color: #f8fafc; }
+        body.night-theme #minute-stack .hand-number-text { color: #cbd5e1; }
+        body.night-theme .btn-menu { background: #38bdf8; color: #0f172a; }
+
+        /* --- TATA LETAK UTAMA --- */
+        .container {
+            text-align: center;
+            padding: 30px;
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: background 0.8s ease;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 { font-size: 1.6rem; margin-bottom: 5px; font-weight: 700; }
+        .theme-status { font-size: 1rem; margin-bottom: 20px; font-weight: 500; opacity: 0.8; }
+
+        .clock-face {
+            width: 280px; height: 280px; border: 10px solid; border-radius: 50%;
+            position: relative; transition: all 0.8s ease; margin-bottom: 25px;
+        }
+        .clock-center { position: absolute; width: 14px; height: 14px; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; z-index: 100; }
+        
+        .mark { position: absolute; font-weight: bold; font-size: 1.1rem; }
+        .mark1  { top: 12px; right: 70px; } .mark2  { top: 65px; right: 18px; }
+        .mark3  { top: 50%; right: 10px; transform: translateY(-50%); } .mark4  { bottom: 65px; right: 18px; }
+        .mark5  { bottom: 12px; right: 70px; } .mark6  { bottom: 10px; left: 50%; transform: translateX(-50%); }
+        .mark7  { bottom: 12px; left: 80px; } .mark8  { bottom: 65px; left: 18px; }
+        .mark9  { top: 50%; left: 10px; transform: translateY(-50%); } .mark10 { top: 65px; left: 18px; }
+        .mark11 { top: 12px; left: 70px; } .mark12 { top: 10px; left: 50%; transform: translateX(-50%); }
+
+        .hand-stack { position: absolute; bottom: 50%; left: 50%; transform-origin: bottom center; display: flex; flex-direction: column-reverse; align-items: center; z-index: 50; width: 20px; }
+        .hand-number-container { width: 20px; height: 20px; display: flex; justify-content: center; align-items: center; }
+        .hand-number-text { font-weight: bold; display: flex; justify-content: center; align-items: center; }
+        #second-stack .hand-number-text { color: #ff3b30; font-size: 1.1rem; }
+
+        /* --- DROP-DOWN MENU --- */
+        .menu-container { margin-top: 10px; width: 100%; }
+        .btn-menu { padding: 12px 24px; font-size: 1rem; font-weight: 600; border: none; border-radius: 12px; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .btn-menu:hover { transform: translateY(-2px); }
+
+        .globe-dropdown { display: none; margin-top: 20px; flex-direction: column; align-items: center; }
+        .globe-dropdown.show { display: flex; }
+        .zone-info { font-size: 0.95rem; font-weight: 600; margin-bottom: 8px; }
+        .instructions { font-size: 0.8rem; opacity: 0.6; margin-bottom: 15px; }
+
+        /* --- CONTAINER CANVAS BOLA GLOBE --- */
+        .globe-wrapper {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            border-radius: 50%;
+            cursor: grab;
+        }
+        .globe-wrapper:active { cursor: grabbing; }
+
+        .globe-shadow-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            border-radius: 50%; pointer-events: none;
+            box-shadow: inset -35px -35px 50px rgba(0,0,0,0.4), inset 15px 15px 30px rgba(255,255,255,0.15);
+            border: 6px solid #1e293b;
+            transition: border-color 0.8s;
+        }
+        body.night-theme .globe-shadow-overlay { border-color: #38bdf8; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+</head>
+<body class="day-theme">
+
+    <div class="container">
+        <h1>Jam Digital X Analog</h1>
+        <div class="theme-status" id="theme-status">☀️ Siang Hari</div>
+        
+        <!-- Jam Meja -->
+        <div class="clock-face">
+            <div class="clock-center"></div>
+            <div class="mark mark12">12</div><div class="mark mark1">1</div><div class="mark mark2">2</div>
+            <div class="mark mark3">3</div><div class="mark mark4">4</div><div class="mark mark5">5</div>
+            <div class="mark mark6">6</div><div class="mark mark7">7</div><div class="mark mark8">8</div>
+            <div class="mark mark9">9</div><div class="mark mark10">10</div><div class="mark mark11">11</div>
+
+            <div class="hand-stack" id="hour-stack"></div>
+            <div class="hand-stack" id="minute-stack"></div>
+            <div class="hand-stack" id="second-stack"></div>
+        </div>
+
+        <!-- Menu Pilihan Globe -->
+        <div class="menu-container">
+            <button class="btn-menu" id="toggle-globe-btn">🌐 Buka Menu Globe Dunia</button>
+            
+            <div class="globe-dropdown" id="globe-dropdown">
+                <div class="zone-info" id="zone-display">Lokasi Aktif: Asia/Jakarta (WIB)</div>
+                <div class="instructions">👈 Geser Bebas Bola Dunia untuk Rotasi 360° 👉</div>
+                
+                <!-- Lingkaran Bola 3D Render -->
+                <div class="globe-wrapper" id="globe-wrapper">
+                    <canvas id="globe-canvas" width="320" height="320"></canvas>
+                    <div class="globe-shadow-overlay"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const hourStack = document.getElementById('hour-stack');
+        const minuteStack = document.getElementById('minute-stack');
+        const secondStack = document.getElementById('second-stack');
+        const themeStatus = document.getElementById('theme-status');
+        const toggleGlobeBtn = document.getElementById('toggle-globe-btn');
+        const globeDropdown = document.getElementById('globe-dropdown');
+        const zoneDisplay = document.getElementById('zone-display');
+        const canvas = document.getElementById('globe-canvas');
+        const ctx = canvas.getContext('2d');
+        const globeWrapper = document.getElementById('globe-wrapper');
+
+        let currentTimezone = "Asia/Jakarta";
+        
+        const locations = [
+            { id: "America/New_York", label: "New York (EST)", lat: 40.7128, lon: -74.0060 },
+            { id: "Europe/London", label: "London (GMT)", lat: 51.5074, lon: -0.1278 },
+            { id: "Asia/Jakarta", label: "Asia/Jakarta (WIB)", lat: -6.2088, lon: 106.8456 },
+            { id: "Asia/Makassar", label: "Asia/Makassar (WITA)", lat: -5.1476, lon: 119.4327 },
+            { id: "Asia/Jayapura", label: "Asia/Jayapura (WIT)", lat: -2.5916, lon: 140.7178 },
+            { id: "Asia/Tokyo", label: "Tokyo (JST)", lat: 35.6762, lon: 139.6503 }
+        ];
+
+        // --- PRE-LOAD HIGH RES WIKIMEDIA SVG IMAGE ---
+        const mapImg = new Image();
+        mapImg.crossOrigin = "anonymous";
+        mapImg.src = 'https://upload.wikimedia.org/wikipedia/commons/3/38/Worldmap-blank.svg';
+
+        // --- KONFIGURASI MATEMATIS D3 GEO PROYEKSI ---
+        const width = 320;
+        const height = 320;
+        const radius = 154;
+        const cx = width / 2;
+        const cy = height / 2;
+
+        const projection = d3.geoOrthographic()
+            .scale(radius)
+            .translate([cx, cy])
+            .clipAngle(90);
+
+        // Atur rotasi default menghadap Indonesia [bujur, lintang]
+        let currentRotate = [-106.8456, 6.2088];
+        projection.rotate(currentRotate);
+
+        mapImg.onload = () => { drawGlobe(); };
+
+        function drawGlobe() {
+            ctx.clearRect(0, 0, width, height);
+            const isNight = document.body.classList.contains('night-theme');
+
+            // 1. Gambar Base Lautan Sferis (Warna abu-abu sesuai image_6c02e7.png)
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = isNight ? '#374151' : '#4b5563'; 
+            ctx.fill();
+
+            // 2. Gambar Kliping Peta Bertekstur Berdasarkan Proyeksi Rotasi 360° D3
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+            ctx.clip();
+
+            // Transformasi rotasi koordinat bola dunia ke pergeseran peta datar 2D siluet
+            let mapWidth = radius * 4;
+            let mapHeight = radius * 2;
+            
+            // Konversi nilai derajat rotasi horizontal bumi milik D3 menjadi offset koordinat X pixel gambar
+            let xOffset = ((currentRotate[0] + 180) % 360) / 360 * mapWidth;
+            // Konversi nilai derajat rotasi vertikal bumi milik D3 menjadi offset koordinat Y pixel gambar
+            let yOffset = (currentRotate[1] / 180) * mapHeight;
+
+            // Render gambar siluet Wikimedia secara berulang (Seamless loop)
+            ctx.drawImage(mapImg, cx - xOffset, cy - radius + yOffset, mapWidth, mapHeight);
+            ctx.drawImage(mapImg, cx - xOffset + mapWidth, cy - radius + yOffset, mapWidth, mapHeight);
+            ctx.drawImage(mapImg, cx - xOffset - mapWidth, cy - radius + yOffset, mapWidth, mapHeight);
+
+            // Terapkan efek filter warna komposit agar peta berubah menjadi hitam pekat (Persis target referensi)
+            ctx.globalCompositeOperation = "source-in";
+            ctx.fillStyle = isNight ? '#111827' : '#1f2937';
+            ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+
+            ctx.restore(); // Kembalikan state canvas normal setelah masking kelar
+
+            // 3. Render Ring Batas Luar Lingkaran Bumi
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = isNight ? '#38bdf8' : '#1e293b';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // 4. Gambar Pin Ring Berongga Ganda Menggunakan Proyeksi Matematika Ortografis D3
+            locations.forEach(loc => {
+                const coords = projection([loc.lon, loc.lat]);
+                const center = projection.invert([cx, cy]);
+                const distance = d3.geoDistance([loc.lon, loc.lat], center);
+
+                // Culling otomatis: Sembunyikan pin jika berputar melewati batas kelengkungan bumi depan
+                if (distance < Math.PI / 2 && coords) {
+                    const [x, y] = coords;
+                    const isActive = (loc.id === currentTimezone);
+
+                    // Cincin Luar
+                    ctx.beginPath();
+                    ctx.arc(x, y, isActive ? 9 : 6, 0, 2 * Math.PI);
+                    ctx.strokeStyle = isActive ? "#3b82f6" : "#ffffff"; 
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    // Rongga Tengah
+                    ctx.beginPath();
+                    ctx.arc(x, y, isActive ? 4 : 2, 0, 2 * Math.PI);
+                    ctx.fillStyle = isActive ? "#ffffff" : (isNight ? '#374151' : '#4b5563');
+                    ctx.fill();
+
+                    loc.screenX = x;
+                    loc.screenY = y;
+                } else {
+                    loc.screenX = null;
+                    loc.screenY = null;
+                }
+            });
+        }
+
+        // --- SISTEM DRAG NAVIGASI 360 DRAINAGE ---
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+
+        function startDrag(x, y) {
+            isDragging = true;
+            previousMousePosition = { x, y };
+        }
+
+        function moveDrag(x, y) {
+            if (!isDragging) return;
+
+            const deltaX = x - previousMousePosition.x;
+            const deltaY = y - previousMousePosition.y;
+
+            const sensitivity = 0.25; 
+            // Update variabel rotasi global yang terikat dengan penggambaran peta wikimedia
+            currentRotate = [
+                currentRotate[0] + deltaX * sensitivity,
+                Math.max(-45, Math.min(45, currentRotate[1] - deltaY * sensitivity)) // Kunci sudut atas-bawah agar tidak terbalik
+            ];
+
+            projection.rotate(currentRotate);
+            previousMousePosition = { x, y };
+            drawGlobe();
+        }
+
+        function stopDrag() { isDragging = false; }
+
+        globeWrapper.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY));
+        window.addEventListener('mousemove', (e) => moveDrag(e.clientX, e.clientY));
+        window.addEventListener('mouseup', stopDrag);
+
+        globeWrapper.addEventListener('touchstart', (e) => {
+            if(e.touches.length === 1) startDrag(e.touches[0].clientX, e.touches[0].clientY);
+        });
+        window.addEventListener('touchmove', (e) => {
+            if(e.touches.length === 1) moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+        });
+        window.addEventListener('touchend', stopDrag);
+
+        // --- EVENT KLIK DETEKTOR ---
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            locations.forEach(loc => {
+                if (loc.screenX !== null && loc.screenY !== null) {
+                    const dist = Math.hypot(clickX - loc.screenX, clickY - loc.screenY);
+                    if (dist < 14) { 
+                        currentTimezone = loc.id;
+                        zoneDisplay.textContent = `Lokasi Aktif: ${loc.label}`;
+                        drawGlobe();
+                        updateHybridClock();
+                    }
+                }
+            });
+        });
+
+        // --- SISTEM ENGINE OPERASI JAM ---
+        function createNumberRows(stackElement, value, count) {
+            stackElement.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                const container = document.createElement('div');
+                container.className = 'hand-number-container';
+                const textNode = document.createElement('div');
+                textNode.className = 'hand-number-text';
+                textNode.textContent = value.toString().padStart(2, '0');
+                container.appendChild(textNode);
+                stackElement.appendChild(container);
+            }
+        }
+
+        function updateHybridClock() {
+            const now = new Date();
+            const formatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: currentTimezone, hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false
+            });
+            const parts = formatter.formatToParts(now);
+            const hours = parseInt(parts.find(p => p.type === 'hour').value);
+            const minutes = parseInt(parts.find(p => p.type === 'minute').value);
+            const seconds = parseInt(parts.find(p => p.type === 'second').value);
+
+            let oldTheme = document.body.className;
+            if (hours >= 6 && hours < 18) {
+                document.body.className = "day-theme";
+                themeStatus.textContent = "☀️ Siang Hari";
+            } else {
+                document.body.className = "night-theme";
+                themeStatus.textContent = "🌙 Malam Hari";
+            }
+
+            if(oldTheme !== document.body.className) { drawGlobe(); }
+
+            createNumberRows(hourStack, hours, 5);    
+            createNumberRows(minuteStack, minutes, 5); 
+            createNumberRows(secondStack, seconds, 5); 
+
+            const secondsDegrees = (seconds * 6);
+            const minutesDegrees = (minutes * 6) + (seconds * 0.1);
+            const hoursDegrees = ((hours % 12) * 30) + (minutes * 0.5);
+
+            applyHybridTransform(hourStack, hoursDegrees);
+            applyHybridTransform(minuteStack, minutesDegrees);
+            applyHybridTransform(secondStack, secondsDegrees);
+        }
+
+        function applyHybridTransform(stackElement, degrees) {
+            stackElement.style.transform = `translateX(-50%) rotate(${degrees}deg)`;
+            const numberTexts = stackElement.querySelectorAll('.hand-number-text');
+            numberTexts.forEach(textNode => { textNode.style.transform = `rotate(-${degrees}deg)`; });
+        }
+
+        toggleGlobeBtn.addEventListener('click', () => {
+            globeDropdown.classList.toggle('show');
+            drawGlobe();
+        });
+
+        setInterval(updateHybridClock, 1000);
+        updateHybridClock();
+    </script>
+</body>
+</html>
