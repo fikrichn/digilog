@@ -90,8 +90,8 @@
         <button class="btn-menu" id="toggle-globe-btn">🌐 Ganti Zona Waktu</button>
         
         <div class="globe-dropdown" id="globe-dropdown">
-            <div class="zone-info" id="zone-display">Lokasi Aktif: Asia/Jakarta (GMT +07:00)</div>
-            <div class="instructions">👈 Geser & klik pin merah untuk memilih seluruh zona waktu dunia 👉</div>
+            <div class="zone-info" id="zone-display">Lokasi Aktif: Mengambil waktu lokal...</div>
+            <div class="instructions">👈 Geser & klik negara mana saja di peta untuk mengubah jam 👉</div>
             
             <div class="globe-wrapper" id="globe-wrapper">
                 <canvas id="globe-canvas" width="320" height="320"></canvas>
@@ -115,47 +115,12 @@
     const context = canvas.getContext('2d');
     const tooltip = document.getElementById('tooltip');
 
-    let currentTimezone = "Asia/Jakarta";
+    let currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Jakarta";
+    let activePinCoords = null; 
+
     const width = canvas.width;
     const height = canvas.height;
     
-    // --- TITIK CAKUPAN GLOBAL SELEURUH NEGARA UTAMA DAN SEMUA 24+ ZONA WAKTU ---
-    const locations = [
-        { id: "Pacific/Midway", city: "Kep. Midway", lat: 28.2101, lon: -177.3761, gmt: "-11:00" },
-        { id: "Pacific/Honolulu", city: "Honolulu (Hawaii)", lat: 21.3069, lon: -157.8583, gmt: "-10:00" },
-        { id: "America/Anchorage", city: "Alaska", lat: 61.2181, lon: -149.9003, gmt: "-08:00" },
-        { id: "America/Los_Angeles", city: "Los Angeles (AS)", lat: 34.0522, lon: -118.2437, gmt: "-07:00" },
-        { id: "America/Denver", city: "Denver (AS)", lat: 39.7392, lon: -104.9903, gmt: "-06:00" },
-        { id: "America/Mexico_City", city: "Meksiko", lat: 19.4326, lon: -99.1332, gmt: "-06:00" },
-        { id: "America/Chicago", city: "Chicago (AS)", lat: 41.8781, lon: -87.6298, gmt: "-05:00" },
-        { id: "America/New_York", city: "New York (AS)", lat: 40.7128, lon: -74.0060, gmt: "-04:00" },
-        { id: "America/Sao_Paulo", city: "São Paulo (Brasil)", lat: -23.5505, lon: -46.6333, gmt: "-03:00" },
-        { id: "Atlantic/Cape_Verde", city: "Tanjung Verde", lat: 14.9315, lon: -23.5125, gmt: "-01:00" },
-        { id: "Europe/London", city: "London (Inggris)", lat: 51.5074, lon: -0.1278, gmt: "+01:00" },
-        { id: "Europe/Paris", city: "Paris (Prancis)", lat: 48.8566, lon: 2.3522, gmt: "+02:00" },
-        { id: "Europe/Berlin", city: "Berlin (Jerman)", lat: 52.5200, lon: 13.4050, gmt: "+02:00" },
-        { id: "Africa/Cairo", city: "Kairo (Mesir)", lat: 30.0444, lon: 31.2357, gmt: "+02:00" },
-        { id: "Europe/Moscow", city: "Moskow (Rusia)", lat: 55.7558, lon: 37.6173, gmt: "+03:00" },
-        { id: "Asia/Riyadh", city: "Riyadh (Arab Saudi)", lat: 24.7136, lon: 46.6753, gmt: "+03:00" },
-        { id: "Asia/Dubai", city: "Dubai (UEA)", lat: 25.2048, lon: 55.2708, gmt: "+04:00" },
-        { id: "Asia/Kolkata", city: "New Delhi (India)", lat: 28.6139, lon: 77.2090, gmt: "+05:30" },
-        { id: "Asia/Dhaka", city: "Dhaka (Bangladesh)", lat: 23.8103, lon: 90.4125, gmt: "+06:00" },
-        { id: "Asia/Jakarta", city: "Jakarta (WIB)", lat: -6.2088, lon: 106.8456, gmt: "+07:00" },
-        { id: "Asia/Bangkok", city: "Bangkok (Thailand)", lat: 13.7563, lon: 100.5018, gmt: "+07:00" },
-        { id: "Asia/Singapore", city: "Singapura", lat: 1.3521, lon: 103.8198, gmt: "+08:00" },
-        { id: "Asia/Makassar", city: "Makassar (WITA)", lat: -5.1476, lon: 119.4327, gmt: "+08:00" },
-        { id: "Asia/Shanghai", city: "Shanghai (Cina)", lat: 31.2304, lon: 121.4737, gmt: "+08:00" },
-        { id: "Asia/Seoul", city: "Seoul (Korsel)", lat: 37.5665, lon: 126.9780, gmt: "+09:00" },
-        { id: "Asia/Tokyo", city: "Tokyo (Jepang)", lat: 35.6762, lon: 139.6503, gmt: "+09:00" },
-        { id: "Asia/Jayapura", city: "Jayapura (WIT)", lat: -2.5916, lon: 140.7178, gmt: "+09:00" },
-        { id: "Australia/Sydney", city: "Sydney (Australia)", lat: -33.8688, lon: 151.2093, gmt: "+10:00" },
-        { id: "Pacific/Noumea", city: "Kaledonia Baru", lat: -22.2735, lon: 166.4468, gmt: "+11:00" },
-        { id: "Pacific/Auckland", city: "Auckland (Selandia Baru)", lat: -36.8485, lon: 174.7633, gmt: "+12:00" },
-        { id: "Pacific/Fiji", city: "Fiji", lat: -18.1248, lon: 178.4501, gmt: "+12:00" },
-        { id: "Pacific/Apia", city: "Samoa", lat: -13.8333, lon: -171.7667, gmt: "+13:00" },
-        { id: "Pacific/Kiritimati", city: "Kiritimati", lat: 1.8736, lon: -157.3631, gmt: "+14:00" }
-    ];
-
     const projection = d3.geoOrthographic()
         .translate([width / 2, height / 2])
         .scale(155)
@@ -177,12 +142,76 @@
         });
     }
 
-    // HANYA AMBIL SATU FILE JSON (Dijamin instan & anti-macet)
+    // AMBIL DATA PETA (Hanya 1 file JSON ringan, dijamin langsung tembus & muncul)
     d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
         .then(topoData => {
             worldData = topojson.feature(topoData, topoData.objects.countries);
+            
+            // Pasang pin awal secara otomatis di koordinat perkiraan timezone pengguna
+            const now = new Date();
+            const offsetMinutes = -now.getTimezoneOffset();
+            const estimatedLon = (offsetMinutes / 60) * 15;
+            activePinCoords = [estimatedLon, -2]; // Taruh di dekat ekuator bujur terkait
+
+            updateZoneDisplayText();
             requestRender();
         }).catch(err => console.error("Gagal load peta:", err));
+
+    function updateZoneDisplayText() {
+        const now = new Date();
+        try {
+            const formatter = new Intl.DateTimeFormat('en-US', { timeZone: currentTimezone, timeZoneName: 'short' });
+            const tzShort = formatter.formatToParts(now).find(p => p.type === 'timeZoneName').value;
+            zoneDisplay.textContent = `Zona Terpilih: ${currentTimezone} (${tzShort})`;
+        } catch(e) {
+            zoneDisplay.textContent = `Zona Terpilih: ${currentTimezone}`;
+        }
+    }
+
+    // --- LOGIKA UTAMA MATEMATIS: Deteksi Zona Waktu Berdasarkan Koordinat Bujur (Global & Instan) ---
+    function findTimezoneFromCoords(lon, lat) {
+        // Cek apakah klik berada di daratan bumi (tidak klik di laut kosong)
+        if (!worldData) return currentTimezone;
+        const clickedOnLand = worldData.features.some(feature => d3.geoContains(feature, [lon, lat]));
+        if (!clickedOnLand) return null; // Jika klik di tengah samudra kosong, abaikan pencarian
+
+        // Aturan khusus: Setiap 15 derajat bujur bumi mewakili perbedaan waktu 1 jam dari GMT
+        let targetOffset = Math.round(lon / 15);
+        
+        // Daftar basis data zona waktu utama bawaan browser modern yang mencakup seluruh dunia
+        const tzDatabase = [
+            { offset: 0, tz: "Europe/London" },
+            { offset: 1, tz: "Europe/Paris" },
+            { offset: 2, tz: "Europe/Kaliningrad" },
+            { offset: 3, tz: "Europe/Moscow" },
+            { offset: 4, tz: "Asia/Dubai" },
+            { offset: 5, tz: "Asia/Karachi" },
+            { offset: 6, tz: "Asia/Dhaka" },
+            { offset: 7, tz: "Asia/Jakarta" },
+            { offset: 8, tz: "Asia/Singapore" },
+            { offset: 9, tz: "Asia/Tokyo" },
+            { offset: 10, tz: "Australia/Sydney" },
+            { offset: 11, tz: "Pacific/Noumea" },
+            { offset: 12, tz: "Pacific/Auckland" },
+            { offset: 13, tz: "Pacific/Apia" },
+            { offset: 14, tz: "Pacific/Kiritimati" },
+            { offset: -1, tz: "Atlantic/Cape_Verde" },
+            { offset: -2, tz: "America/Noronha" },
+            { offset: -3, tz: "America/Sao_Paulo" },
+            { offset: -4, tz: "America/New_York" },
+            { offset: -5, tz: "America/Chicago" },
+            { offset: -6, tz: "America/Denver" },
+            { offset: -7, tz: "America/Los_Angeles" },
+            { offset: -8, tz: "America/Anchorage" },
+            { offset: -9, tz: "Pacific/Gambier" },
+            { offset: -10, tz: "Pacific/Honolulu" },
+            { offset: -11, tz: "Pacific/Midway" }
+        ];
+
+        // Cari zona terdekat dari database di atas yang cocok dengan derajat bujur lokasi klik
+        let match = tzDatabase.find(item => item.offset === targetOffset);
+        return match ? match.tz : "UTC";
+    }
 
     function render(){
         if (!globeDropdown.classList.contains('show')) return;
@@ -190,13 +219,13 @@
         context.clearRect(0, 0, width, height);
         const isNight = document.body.classList.contains('night-theme');
 
-        // Render Air Laut
+        // Air Laut
         context.beginPath();
         path({type: "Sphere"});
         context.fillStyle = isNight ? '#0b1329' : '#bfe9ff';
         context.fill();
 
-        // Render Benua (Warna Kontras)
+        // Benua (Warna Kontras Tajam)
         if (worldData) {
             context.beginPath();
             path(worldData);
@@ -208,28 +237,20 @@
             context.stroke();
         }
 
-        // Render Semua Pin Kota/Negara Dunia
-        locations.forEach(location => {
-            const coord = [location.lon, location.lat];
-            const gdistance = d3.geoDistance(coord, projection.invert([width/2, height/2]));
-            
+        // Render Pin Dinamis di Negara yang Dipilih
+        if (activePinCoords) {
+            const gdistance = d3.geoDistance(activePinCoords, projection.invert([width/2, height/2]));
             if (gdistance < Math.PI / 2) {
                 context.beginPath();
-                path({type: "Point", coordinates: coord});
-                
-                if (location.id === currentTimezone) {
-                    context.fillStyle = "#a855f7"; 
-                    context.arc(projection(coord)[0], projection(coord)[1], 7, 0, 2*Math.PI);
-                } else {
-                    context.fillStyle = "red"; 
-                    context.arc(projection(coord)[0], projection(coord)[1], 4.5, 0, 2*Math.PI);
-                }
+                path({type: "Point", coordinates: activePinCoords});
+                context.fillStyle = "#a855f7"; // Pin ungu neon menyala
+                context.arc(projection(activePinCoords)[0], projection(activePinCoords)[1], 7, 0, 2*Math.PI);
                 context.fill();
                 context.strokeStyle = "#ffffff";
-                context.lineWidth = 1.5;
+                context.lineWidth = 2;
                 context.stroke();
             }
-        });
+        }
     }
 
     let rotate = projection.rotate();
@@ -254,63 +275,61 @@
 
     d3.select(canvas).call(drag);
 
+    // --- KLIK DARATAN NEGARA MANA SAJA ---
     canvas.addEventListener('click', (e) => {
         if (dragging) return;
         const rect = canvas.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         const clickY = e.clientY - rect.top;
 
-        locations.forEach(location => {
-            const coord = [location.lon, location.lat];
-            const gdistance = d3.geoDistance(coord, projection.invert([width/2, height/2]));
+        const geoCoords = projection.invert([clickX, clickY]);
+
+        if (geoCoords && !isNaN(geoCoords[0]) && !isNaN(geoCoords[1])) {
+            const detectedTz = findTimezoneFromCoords(geoCoords[0], geoCoords[1]);
             
-            if (gdistance < Math.PI / 2) {
-                const pixelPos = projection(coord);
-                if (pixelPos) {
-                    const dist = Math.hypot(clickX - pixelPos[0], clickY - pixelPos[1]);
-                    if (dist < 12) {
-                        currentTimezone = location.id;
-                        zoneDisplay.textContent = `Lokasi Aktif: ${location.city} (GMT ${location.gmt})`;
-                        requestRender();
-                        updateHybridClock();
-                    }
-                }
+            if (detectedTz) { // Hanya merespon jika yang diklik adalah daratan negara
+                currentTimezone = detectedTz;
+                activePinCoords = [geoCoords[0], geoCoords[1]]; // Pindahkan pin ungu ke lokasi klik baru
+                
+                updateZoneDisplayText();
+                requestRender();
+                updateHybridClock();
             }
-        });
+        }
     });
 
+    // HOVER TOOLTIP DARATAN
     canvas.addEventListener("mousemove", (e) => {
         if (dragging) return; 
 
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
-        let found = false;
 
-        locations.forEach(location => {
-            const coord = [location.lon, location.lat];
-            const gdistance = d3.geoDistance(coord, projection.invert([width/2, height/2]));
+        const geoCoords = projection.invert([mouseX, mouseY]);
 
-            if (gdistance < Math.PI / 2) {
-                const pixelPos = projection(coord);
-                if (pixelPos) {
-                    const dist = Math.hypot(mouseX - pixelPos[0], mouseY - pixelPos[1]);
-                    if (dist < 12) { 
-                        tooltip.style.display = "block";
-                        tooltip.style.left = e.pageX + 15 + "px";
-                        tooltip.style.top = e.pageY + 15 + "px";
-                        tooltip.innerHTML = `
-                            <strong>📍 ${location.city}</strong><br>
-                            <span style="font-size:11px; opacity:0.8;">${location.id}</span><br>
-                            <span style="color:#a855f7; font-weight:600;">GMT ${location.gmt}</span>
-                        `;
-                        found = true;
-                    }
-                }
+        if (geoCoords && !isNaN(geoCoords[0]) && !isNaN(geoCoords[1])) {
+            const tempTz = findTimezoneFromCoords(geoCoords[0], geoCoords[1]);
+            
+            if (tempTz) {
+                const now = new Date();
+                let shortName = "GMT";
+                try {
+                    shortName = new Intl.DateTimeFormat('en-US', { timeZone: tempTz, timeZoneName: 'short' }).formatToParts(now).find(p => p.type === 'timeZoneName').value;
+                } catch(err){}
+
+                tooltip.style.display = "block";
+                tooltip.style.left = e.pageX + 15 + "px";
+                tooltip.style.top = e.pageY + 15 + "px";
+                tooltip.innerHTML = `
+                    <strong>🗺️ Daratan Terdeteksi</strong><br>
+                    <span style="font-size:11px; opacity:0.8;">Zona: ${tempTz}</span><br>
+                    <span style="color:#38bdf8; font-weight:600;">Waktu: ${shortName}</span>
+                `;
+                return;
             }
-        });
-
-        if (!found) tooltip.style.display = "none";
+        }
+        tooltip.style.display = "none";
     });
 
     canvas.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
