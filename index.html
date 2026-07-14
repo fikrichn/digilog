@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RoValra Style - Perfect 3D Region Globe</title>
+    <title>RoValra Style - Accurate Online 3D Globe</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -67,12 +67,14 @@
         .globe-wrapper:active { cursor: grabbing; }
         .globe-shadow-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; pointer-events: none;
-            box-shadow: inset -30px -30px 50px rgba(0,0,0,0.5), inset 10px 10px 20px rgba(255,255,255,0.1);
+            box-shadow: inset -30px -30px 50px rgba(0,0,0,0.5), inset 10px 10px 20px rgba(255,255,255,0.15);
             border: 5px solid #1e293b; transition: border-color 0.8s;
         }
         body.night-theme .globe-shadow-overlay { border-color: #38bdf8; }
     </style>
+    <!-- Memuat Library D3.js v7 Core + Kebutuhan TopoJSON untuk membaca data map online -->
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson@3"></script>
 </head>
 <body class="day-theme">
 
@@ -124,25 +126,6 @@
             easterEggActive: false
         };
 
-        // --- DATA VEKTOR DARATAN NEGARA 100% OFFLINE (Presisi Akurat) ---
-        const WorldLandVectors = {
-            type: "FeatureCollection",
-            features: [
-                // Eurasia + Asia + Indonesia Archipelago asli lengkap
-                { type: "Feature", geometry: { type: "Polygon", coordinates: [[[-9,36],[2,36],[12,43],[16,39],[23,42],[31,46],[35,41],[43,41],[60,60],[80,65],[110,70],[140,68],[170,67],[172,61],[140,50],[130,35],[140,35],[130,22],[110,20],[105,5],[115,-6],[125,-8],[140,-2],[140,-9],[105,-10],[95,-5],[100,15],[80,10],[70,25],[40,15],[30,30],[-9,36]]] } },
-                // Australia
-                { type: "Feature", geometry: { type: "Polygon", coordinates: [[[113,-22],[114,-35],[143,-38],[151,-33],[153,-15],[142,-11],[130,-12],[113,-22]]] } },
-                // Afrika
-                { type: "Feature", geometry: { type: "Polygon", coordinates: [[[-17,32],[32,31],[51,11],[40,-34],[15,-34],[-17,32]]] } },
-                // Amerika Utara
-                { type: "Feature", geometry: { type: "Polygon", coordinates: [[[-163,65],[-120,69],[-80,60],[-54,54],[-70,45],[-80,25],[-99,26],[-110,23],[-124,48],[-163,65]]] } },
-                // Amerika Selatan
-                { type: "Feature", geometry: { type: "Polygon", coordinates: [[[-80,9],[-49, -2],[-43,-22],[-66,-54],[-75,-45],[-81,-5],[-80,9]]] } },
-                // Greenland / Utara
-                { type: "Feature", geometry: { type: "Polygon", coordinates: [[[-50,80],[-20,75],[-40,60],[-60,65],[-50,80]]] } }
-            ]
-        };
-
         const canvas = document.getElementById('globe-canvas');
         const ctx = canvas.getContext('2d');
         const globeContainer = document.getElementById('globe-container');
@@ -150,13 +133,14 @@
         const logoTrigger = document.getElementById('easter-egg-trigger');
 
         let currentTimezone = "Asia/Jakarta";
+        let worldFeatures = null; // Menyimpan data peta online setelah terunduh
 
         const regionToTimezoneMap = {
             "us-east": "America/New_York", "uk-london": "Europe/London", "as-jakarta": "Asia/Jakarta",
             "as-makassar": "Asia/Makassar", "as-jayapura": "Asia/Jayapura", "as-tokyo": "Asia/Tokyo"
         };
 
-        // --- KONFIGURASI ENGINE PROYEKSI SFERIS D3 ---
+        // --- SETUP KOORDINAT ENGINE PROYEKSI SFERIS D3 ---
         const radius = 154;
         const projection = d3.geoOrthographic()
             .scale(radius)
@@ -165,33 +149,45 @@
 
         const path = d3.geoPath(projection, ctx);
         
-        // Kamera fokus awal menghadap koordinat Indonesia [Bujur, Lintang]
-        let currentRotate = [-106.8456, 6.2088];
+        let currentRotate = [-106.8456, 6.2088]; // Fokus kamera awal menghadap Indonesia
         projection.rotate(currentRotate);
+
+        // --- AMBIL DATA DATA NEGARA DUNIA ONLINE (110m resolution GeoJSON) ---
+        fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+            .then(response => response.json())
+            .then(topoData => {
+                // Parsing format TopoJSON menjadi Fitur Bentuk Geometris Vektor Negara
+                worldFeatures = topojson.feature(topoData, topoData.objects.countries);
+                drawRovalraGlobe();
+            })
+            .catch(err => console.error("Koneksi gagal saat mengambil peta dunia online:", err));
 
         function drawRovalraGlobe() {
             ctx.clearRect(0, 0, 320, 320);
             const isNight = document.body.classList.contains('night-theme');
 
-            // 1. Gambar Base Samudra / Laut (Warna kontras abu-abu gelap)
+            // 1. Gambar Base Samudra / Laut (Warna flat kontras abu-abu pekat sesuai image_6c02e7.png)
             ctx.beginPath();
             ctx.arc(160, 160, radius, 0, 2 * Math.PI);
             ctx.fillStyle = isNight ? '#222d3d' : '#334155'; 
             ctx.fill();
 
-            // 2. Render Garis Grid Bumi (Graticule) biar makin estetik 3D
+            // 2. Render Garis Grid Sferis Bumi (Graticule)
             ctx.beginPath();
             path({type: "Graticule"})();
-            ctx.strokeStyle = isNight ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.1)';
+            ctx.strokeStyle = isNight ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.08)';
             ctx.lineWidth = 0.8;
             ctx.stroke();
 
-            // 3. Render Gambar Batas Daratan Vektor (Hitam Pekat Menolak Buram)
+            // Tahan penggambaran daratan jika request jaringan belum rampung
+            if (!worldFeatures) return;
+
+            // 3. Render Batas Negara Peta Vektor Online (Warna gelap pekat contrast tinggi)
             ctx.beginPath();
-            path(WorldLandVectors);
+            path(worldFeatures);
             ctx.fillStyle = isNight ? '#0b0f17' : '#0f172a'; 
             ctx.strokeStyle = isNight ? '#1e293b' : '#1e293b';
-            ctx.lineWidth = 1.2;
+            ctx.lineWidth = 1.0;
             ctx.fill();
             ctx.stroke();
 
@@ -201,7 +197,7 @@
                 const center = projection.invert([160, 160]);
                 const geoDistance = d3.geoDistance([reg.lon, reg.lat], center);
 
-                // Hilangkan pin jika berputar ke belahan bumi belakang layar
+                // Sembunyikan pin jika berputar masuk ke belahan bumi belakang layar
                 if (geoDistance < Math.PI / 2 && xy) {
                     const [x, y] = xy;
                     const isActive = (regionToTimezoneMap[reg.code] === currentTimezone);
@@ -226,7 +222,7 @@
             });
         }
 
-        // --- EVENT POINTER DRAG CONTROLLER (100% RESPONSIVE) ---
+        // --- EVENT POINTER DRAG CONTROLLER (360 DEGREES ROTATION) ---
         const GLOBE_DRAG_THRESHOLD = 4;
         let pointerDragged = false;
 
@@ -252,7 +248,7 @@
                 const sensitivity = 0.25;
                 const r = projection.rotate();
                 
-                // Update rotasi sferis bumi 360 derajat
+                // Kalkulasi pergeseran matriks rotasi bumi
                 currentRotate = [
                     r[0] + deltaX * sensitivity, 
                     Math.max(-55, Math.min(55, r[1] - deltaY * sensitivity))
@@ -373,7 +369,7 @@
             drawRovalraGlobe();
         });
 
-        drawRovalraGlobe();
+        // Run Engine Clock
         setInterval(updateHybridClock, 1000);
         updateHybridClock();
     </script>
