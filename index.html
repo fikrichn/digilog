@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jam Digital X Analog</title>
+    <title>Jam Digital X Analog - Accurate 3D Canvas Globe</title>
     <style>
         * {
             box-sizing: border-box;
@@ -162,11 +162,11 @@
 
         <!-- Menu Pilihan Globe -->
         <div class="menu-container">
-            <button class="btn-menu" id="toggle-globe-btn">🌐 PILIH ZONA WAKTU</button>
+            <button class="btn-menu" id="toggle-globe-btn">🌐 Buka Menu Globe Dunia</button>
             
             <div class="globe-dropdown" id="globe-dropdown">
                 <div class="zone-info" id="zone-display">Lokasi Aktif: Asia/Jakarta (GMT +07:00)</div>
-                
+                <div class="instructions">👈 Geser Bola Dunia untuk Rotasi 3D Non-Limit 👉</div>
                 
                 <!-- Lingkaran Bola 3D Render -->
                 <div class="globe-wrapper" id="globe-wrapper">
@@ -195,7 +195,6 @@
 
         let currentTimezone = "Asia/Jakarta";
         
-        // --- DATA GEOGRAFIS AKTIF + DATA GMT ---
         const locations = [
             { id: "America/New_York", city: "New York", lat: 40.7128, lon: -74.0060, gmt: "-04:00" },
             { id: "Europe/London", city: "London", lat: 51.5074, lon: -0.1278, gmt: "+01:00" },
@@ -205,108 +204,142 @@
             { id: "Asia/Tokyo", city: "Tokyo", lat: 35.6762, lon: 139.6503, gmt: "+09:00" }
         ];
 
-        // --- ENGINE GENERATOR MAP SHARP HD VECTORS ---
+        // --- ULTRA HIGH-RES 3D ORTHOGRAPHIC ENGINE ---
         const mapImg = new Image();
         mapImg.crossOrigin = "anonymous";
         mapImg.src = 'https://upload.wikimedia.org/wikipedia/commons/3/38/Worldmap-blank.svg';
 
-        let rotationLon = 105; // Fokus awal menghadap Indonesia
+        let rotationLon = 105; // Fokus ke Indonesia
         const radius = 154;    
         const cx = 160, cy = 160;
 
         let isDragging = false;
         let lastX = 0;
 
+        // Bikin map canvas buffer beresolusi super besar (HD Ultra) agar saat ditarik/dilengkungkan tidak buram
+        const mapCanvas = document.createElement('canvas');
+        const mctx = mapCanvas.getContext('2d');
+        let mapData = null;
+        const MW = 2880; 
+        const MH = 1440;
+
         mapImg.onload = () => {
+            mapCanvas.width = MW;
+            mapCanvas.height = MH;
+            mctx.drawImage(mapImg, 0, 0, MW, MH);
+            mapData = mctx.getImageData(0, 0, MW, MH);
             drawGlobe();
         };
 
         function drawGlobe() {
             ctx.clearRect(0, 0, 320, 320);
 
-            // 1. Render Background Air Laut Sesuai Tema
+            // Base air laut bawah
             ctx.beginPath();
             ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
             const isNight = document.body.classList.contains('night-theme');
             ctx.fillStyle = isNight ? '#0b1329' : '#cceeff';
             ctx.fill();
 
-            // 2. Kliping Lingkaran Bola (Mengunci Agar Peta Selalu Berbentuk Bulat Tajam HD)
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
-            ctx.clip();
+            if (!mapData) return;
 
-            // Atur Ukuran Dimensi Render Peta Yang Sesuai Skala Keliling Bola
-            const mapWidth = radius * 4; 
-            const mapHeight = radius * 2;
+            const globeImgData = ctx.createImageData(320, 320);
+            const data = globeImgData.data;
 
-            // Rumus Translasi Sinkronisasi Koordinat Derajat Ke Pixel Horizontal Tanpa Mirroring
-            // Skala: 360 derajat peta datar disamakan dengan lebar keliling visual bola
-            let xOffset = ((rotationLon + 180) % 360) / 360 * mapWidth;
+            // MATEMATIKA RAYTRACING SFERIS 3D ASLI (Peta melar & melengkung mengikuti bentuk bola murni)
+            for (let y = 0; y < 320; y++) {
+                const dy = y - cy;
+                for (let x = 0; x < 320; x++) {
+                    const dx = x - cx;
+                    
+                    if (dx * dx + dy * dy <= radius * radius) {
+                        const nx = dx / radius;
+                        const ny = dy / radius;
+                        const nz = Math.sqrt(1 - nx * nx - ny * ny);
 
-            // Gambar Seamless Loop Peta Berulang Horizontal Secara Tajam & Anti-Alias Sempurna
-            ctx.drawImage(mapImg, cx - xOffset, cy - radius, mapWidth, mapHeight);
-            ctx.drawImage(mapImg, cx - xOffset + mapWidth, cy - radius, mapWidth, mapHeight);
-            ctx.drawImage(mapImg, cx - xOffset - mapWidth, cy - radius, mapWidth, mapHeight);
+                        // Proyeksi bola ortografis murni (Tidak terbalik & tidak ke-mirror)
+                        const latVal = Math.asin(-ny);
+                        const lonVal = Math.atan2(nx, nz);
 
-            // Filter Warna Peta Berdasarkan Siang / Malam
-            if (isNight) {
-                // Skema filter malam: Membalik benua menjadi kontras gelap bernuansa hijau militer/cyberpunk
-                ctx.globalCompositeOperation = "difference";
-                ctx.fillStyle = "rgba(110, 80, 110, 0.45)";
-                ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
-                ctx.globalCompositeOperation = "source-over";
-            } else {
-                // Skema filter siang: Berikan efek tint hijau segar alami di atas benua abu-abu bawaan SVG
-                ctx.globalCompositeOperation = "source-atop";
-                ctx.fillStyle = "rgba(46, 125, 50, 0.35)";
-                ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
-                ctx.globalCompositeOperation = "source-over";
+                        const geoLat = latVal * 180 / Math.PI;
+                        let geoLon = rotationLon + (lonVal * 180 / Math.PI);
+                        
+                        // Sistem wrapping putaran 360 derajat non-limit murni tanpa batas
+                        geoLon = ((geoLon + 180) % 360 + 360) % 360 - 180;
+
+                        // Konversi ke koordinat piksel map resolusi tinggi (MW x MH)
+                        const mapX = Math.floor(((geoLon + 180) / 360) * MW);
+                        const mapY = Math.floor(((90 - geoLat) / 180) * MH);
+
+                        if (mapX >= 0 && mapX < MW && mapY >= 0 && mapY < MH) {
+                            const srcIdx = (mapY * MW + mapX) * 4;
+                            const destIdx = (y * 320 + x) * 4;
+
+                            let r = mapData.data[srcIdx];
+                            let g = mapData.data[srcIdx+1];
+                            let b = mapData.data[srcIdx+2];
+
+                            // Pewarnaan benua cerah dan tajam
+                            if (r > 100 && g > 100 && b > 100) {
+                                if (isNight) {
+                                    r = 30; g = 70; b = 45; // Hijau gelap estetik malam
+                                } else {
+                                    r = 76; g = 175; b = 80; // Hijau cerah HD siang
+                                }
+                            } else {
+                                // Garis pembatas benua
+                                r = isNight ? 56 : 50;
+                                g = isNight ? 189 : 120;
+                                b = isNight ? 248 : 65;
+                            }
+
+                            data[destIdx] = r;
+                            data[destIdx+1] = g;
+                            data[destIdx+2] = b;
+                            data[destIdx+3] = 255;
+                        }
+                    }
+                }
             }
-            ctx.restore();
+            ctx.putImageData(globeImgData, 0, 0);
 
-            // 3. Proyeksi Pin Lokasi 3D Orthographic Murni - Akurat 100% Menempel di Negara Aslinya
+            // 3. Render Pin Lokasi 3D Sinkronisasi 1:1 Sempurna dengan Tekstur Bumi
             locations.forEach(loc => {
                 const radLat = loc.lat * Math.PI / 180;
-                // Sinkronisasi arah perputaran derajat peta murni un-mirrored
                 const radLon = (loc.lon - rotationLon) * Math.PI / 180;
 
-                // Matematika Proyeksi Bola Depan Sferis
                 const px = radius * Math.cos(radLat) * Math.sin(radLon);
                 const py = -radius * Math.sin(radLat);
-                const pz = Math.cos(radLat) * Math.cos(radLon); // pz > 0 artinya belahan bumi depan yang terlihat mata
+                const pz = Math.cos(radLat) * Math.cos(radLon);
 
                 if (pz > 0) {
                     ctx.beginPath();
                     ctx.arc(cx + px, cy + py, loc.id === currentTimezone ? 10 : 7, 0, 2 * Math.PI);
                     
                     if (loc.id === currentTimezone) {
-                        ctx.fillStyle = "#a855f7"; // Ungu Menyala Glow Aktif
+                        ctx.fillStyle = "#a855f7"; 
                         ctx.shadowColor = "#c084fc";
                         ctx.shadowBlur = 15;
                     } else {
-                        ctx.fillStyle = "#ef4444"; // Merah Akurat
+                        ctx.fillStyle = "#ef4444"; 
                         ctx.shadowBlur = 0;
                     }
                     ctx.strokeStyle = "#ffffff";
                     ctx.lineWidth = 2;
                     ctx.fill();
                     ctx.stroke();
-                    ctx.shadowBlur = 0; // Reset
+                    ctx.shadowBlur = 0;
                     
-                    // Kunci koordinat posisi pin dilayar untuk fungsi hover mouse tracker & trigger click
                     loc.screenX = cx + px;
                     loc.screenY = cy + py;
                 } else {
-                    // Sembunyikan pin jika berputar masuk ke belahan bumi bagian belakang
                     loc.screenX = null;
                     loc.screenY = null;
                 }
             });
         }
 
-        // --- SISTEM HOVER TOOLTIP AKURAT ---
+        // --- HOVER TOOLTIP TRACKER ---
         canvas.addEventListener("mousemove", (e) => {
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
@@ -338,7 +371,7 @@
             tooltip.style.display = "none";
         });
 
-        // --- INTERAKSI GESER (DRAG) 360° NON-LIMIT SEAMLESS ---
+        // --- GEAR PUTAR DRAG 360 DERAJAT NON-LIMIT ---
         function startDrag(x) { 
             isDragging = true; 
             lastX = x; 
@@ -348,10 +381,8 @@
             if (!isDragging) return;
             let deltaX = x - lastX;
             
-            // Mengubah nilai bujur kamera bumi secara kontinu berlawanan arah gerak drag (alami)
+            // Pengurangan agar arah gerak bola sinkron mengikuti tarikan mouse kursor secara natural
             rotationLon -= deltaX * 0.4; 
-            
-            // Loop tanpa batas 0 - 360 derajat murni
             rotationLon = (rotationLon % 360 + 360) % 360;
             
             lastX = x;
@@ -370,7 +401,7 @@
         window.addEventListener('touchmove', (e) => moveDrag(e.touches[0].pageX));
         window.addEventListener('touchend', stopDrag);
 
-        // --- KLIK PIN LOKASI ---
+        // TRIGGER KLIK PIN
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -389,7 +420,7 @@
             });
         });
 
-        // --- SISTEM UTAMA ENGINE JAM ---
+        // --- ENGINE JAM ---
         function createNumberRows(stackElement, value, count) {
             stackElement.innerHTML = '';
             for (let i = 0; i < count; i++) {
@@ -398,7 +429,8 @@
                 const textNode = document.createElement('div');
                 textNode.className = 'hand-number-text';
                 textNode.textContent = value.toString().padStart(2, '0');
-                container.appendChild(textNode);
+                container.appendChild(container);
+                container.replaceChild(textNode, container.firstChild || textNode);
                 stackElement.appendChild(container);
             }
         }
