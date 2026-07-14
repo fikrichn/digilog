@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jam Digital X Analog - Accurate 3D Canvas Globe</title>
-    <!-- Memuat library D3.js versi 7 secara eksternal -->
+    <!-- Memuat library D3.js versi 7 -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         * {
@@ -208,40 +208,27 @@
             { id: "Asia/Tokyo", city: "Tokyo", lat: 35.6762, lon: 139.6503, gmt: "+09:00" }
         ];
 
-        // --- DATA PETA SIMPLIFIED GEOJSON (Lokal & Bebas CORS) ---
-        // Digunakan agar file bisa langsung dibuka secara offline via browser biasa tanpa localhost server
-        const worldGeoJSON = {
-            "type": "FeatureCollection",
-            "features": [
-                // Asia & Eropa (Eurasia)
-                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[30,65],[60,70],[90,75],[120,75],[160,70],[170,60],[140,50],[120,30],[100,10],[105,-5],[115,-7],[125,10],[140,35],[130,35],[120,20],[100,20],[90,22],[75,10],[70,25],[60,25],[50,15],[45,25],[35,30],[40,40],[25,40],[15,50],[30,65]]]}},
-                // Kepulauan Indonesia & Filipina & Jepang (Simplified cluster)
-                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[95,-5],[142,-1],[140,-9],[95,-9],[95,-5]]]}},
-                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[110,15],[125,20],[125,5],[115,5],[110,15]]]}},
-                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[130,30],[145,45],[140,45],[130,35],[130,30]]]}},
-                // Australia
-                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[113,-22],[115,-34],[135,-33],[145,-38],[151,-33],[142,-11],[136,-11],[113,-22]]]}},
-                // Afrika
-                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-17,15],[10,5],[30,30],[32,15],[51,11],[40,-5],[20,-34],[15,-30],[10,0],[-17,15]]]}},
-                // Amerika Utara
-                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-165,65],[-120,70],[-80,70],[-60,50],[-50,45],[-80,25],[-100,25],[-110,10],[-90,15],[-120,35],[-125,50],[-165,65]]]}},
-                // Amerika Selatan
-                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-80,10],[-40,-5],[-35,-7],[-60,-50],[-70,-55],[-75,-40],[-70,-20],[-80,10]]]}},
-                // Antartika
-                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-180,-70],[180,-70],[180,-85],[-180,-85],[-180,-70]]]}}
-            ]
-        };
-
         // --- 1. PROYEKSI D3 GEOGRAPHIC ORTHOGRAPHIC ---
         const projection = d3.geoOrthographic()
             .translate([width / 2, height / 2])
             .scale(155)
             .clipAngle(90)
             .precision(0.5)
-            .rotate([-105, 5]); // Kamera awal menghadap Indonesia/Asia
+            .rotate([-105, 5]); // Kamera awal fokus ke arah Asia/Indonesia
 
         // --- 3. PATH RENDER ---
         const path = d3.geoPath(projection, context);
+        let worldData = null;
+
+        // Mengambil GeoJSON resmi resolusi 1:110m (Aman & lancar diload via GitHub Pages)
+        d3.json("https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson")
+            .then(geojson => {
+                worldData = geojson;
+                render();
+            })
+            .catch(err => {
+                console.error("Gagal memuat peta dari GitHub CDN:", err);
+            });
 
         function render(){
             context.clearRect(0, 0, width, height);
@@ -253,23 +240,25 @@
             context.fillStyle = isNight ? '#0b1329' : '#bfe9ff';
             context.fill();
 
-            // Render Benua / Daratan Dunia (Berdasarkan variabel Lokal)
-            context.beginPath();
-            path(worldGeoJSON);
-            context.fillStyle = isNight ? '#22c55e' : '#4CAF50';
-            context.fill();
-            
-            // Outline garis pantai benua
-            context.strokeStyle = isNight ? '#0f172a' : '#ffffff';
-            context.lineWidth = 1;
-            context.stroke();
+            // Render Benua / Daratan Dunia asli yang mendetail
+            if (worldData) {
+                context.beginPath();
+                path(worldData);
+                context.fillStyle = isNight ? '#22c55e' : '#4CAF50';
+                context.fill();
+                
+                // Outline batas pantai benua/negara
+                context.strokeStyle = isNight ? '#0f172a' : '#ffffff';
+                context.lineWidth = 0.6;
+                context.stroke();
+            }
 
             // --- 4. RENDER MARKER TIMEZONE OTOMATIS ---
             locations.forEach(location => {
                 const coord = [location.lon, location.lat];
                 const gdistance = d3.geoDistance(coord, projection.invert([width/2, height/2]));
                 
-                // Sembunyikan marker jika koordinat berada di sisi belakang belahan bumi (clipping)
+                // Sembunyikan marker jika koordinat berada di belahan bumi belakang (clipping)
                 if (gdistance < Math.PI / 2) {
                     context.beginPath();
                     path({
@@ -278,14 +267,13 @@
                     });
                     
                     if (location.id === currentTimezone) {
-                        context.fillStyle = "#a855f7"; // Pin aktif berwarna ungu neon
+                        context.fillStyle = "#a855f7"; // Pin aktif ungu neon bersinar
                         context.arc(projection(coord)[0], projection(coord)[1], 8, 0, 2*Math.PI);
                     } else {
-                        context.fillStyle = "red"; // Pin lainnya merah biasa
+                        context.fillStyle = "red"; // Pin standar merah
                     }
                     context.fill();
 
-                    // Stroke putih di sekeliling marker agar terlihat kontras
                     context.strokeStyle = "#ffffff";
                     context.lineWidth = 1.5;
                     context.stroke();
@@ -293,7 +281,7 @@
             });
         }
 
-        // --- 2. SISTEM DRAG / NAVIGASI D3 ROTASI 360 TANPA LIMIT ---
+        // --- 2. SISTEM DRAG NAVIGASI D3 ROTASI HORIZONTAL NON-LIMIT ---
         let rotate = projection.rotate();
         let last = [0, 0];
 
@@ -302,11 +290,10 @@
                 last = [event.x, event.y];
             })
             .on("drag", (event) => {
-                // Update rotasi horizontal tanpa limit %360, serta rotasi vertikal dibatasi
                 rotate[0] += (event.x - last[0]) * 0.35;
                 rotate[1] -= (event.y - last[1]) * 0.35;
 
-                // Batasi pergerakan sudut kamera atas & bawah saja (Latitude)
+                // Batasi hanya pergerakan atas bawah (latitude)
                 rotate[1] = Math.max(-90, Math.min(90, rotate[1]));
 
                 projection.rotate(rotate);
@@ -315,10 +302,10 @@
                 last = [event.x, event.y];
             });
 
-        // Hubungkan event drag D3 ke canvas globe
+        // Pasangkan modul drag D3 ke element canvas
         d3.select(canvas).call(drag);
 
-        // --- 5. KLIK MARKER TIMEZONE ---
+        // --- 5. KLIK PIN MARKER TIMEZONE ---
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -329,7 +316,7 @@
                 const gdistance = d3.geoDistance(coord, projection.invert([width/2, height/2]));
                 
                 if (gdistance < Math.PI / 2) {
-                    // projection(location) memperoleh posisi pixel marker di canvas
+                    // projection memperoleh koordinat pixel presisi [X, Y] dari data lokasi
                     const pixelPos = projection(coord);
                     if (pixelPos) {
                         const dist = Math.hypot(clickX - pixelPos[0], clickY - pixelPos[1]);
@@ -344,7 +331,7 @@
             });
         });
 
-        // --- SYSTEM HOVER TOOLTIP BERBASIS PROYEKSI PIXEL D3 ---
+        // --- SYSTEM HOVER TOOLTIP AKURAT ---
         canvas.addEventListener("mousemove", (e) => {
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
@@ -381,7 +368,7 @@
             tooltip.style.display = "none";
         });
 
-        // --- ENGINE SISTEM JAM HYBRID ---
+        // --- ENGINE KONTROL JAM HYBRID ---
         function createNumberRows(stackElement, value, count) {
             stackElement.innerHTML = '';
             for (let i = 0; i < count; i++) {
@@ -440,8 +427,6 @@
             render();
         });
 
-        // Trigger render awal sekali agar peta langsung tampil saat pertama dimuat
-        render();
         setInterval(updateHybridClock, 1000);
         updateHybridClock();
     </script>
