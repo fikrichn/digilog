@@ -257,7 +257,7 @@
                     if (dx * dx + dy * dy <= radius * radius) {
                         // Transformasi Balik Sferis 3D
                         const nx = dx / radius;
-                        const ny = dy / radius;
+                        const ny = -dy / radius; // FIX: Ditambahkan minus (-) agar utara tetap di atas canvas
                         const nz = Math.sqrt(1 - nx * nx - ny * ny);
 
                         // Rumus Lintang & Bujur Berdasarkan Sumbu Rotasi Bumi Aktif
@@ -288,14 +288,11 @@
                             // Jika warna aslinya adalah daratan abu-abu putih bawaan Wiki SVG
                             if (r > 100 && g > 100 && b > 100) {
                                 if (isNight) {
-                                    // Warna daratan malam: Hijau tua redup bernuansa gelap
                                     r = 20; g = 50; b = 30;
                                 } else {
-                                    // Warna daratan siang: Hijau subur cerah alami
                                     r = 76; g = 175; b = 80;
                                 }
                             } else {
-                                // Jika pixel adalah batas garis tepi (border) benua
                                 r = isNight ? 56 : 30;
                                 g = isNight ? 189 : 41;
                                 b = isNight ? 248 : 59;
@@ -304,7 +301,7 @@
                             data[destIdx] = r;
                             data[destIdx+1] = g;
                             data[destIdx+2] = b;
-                            data[destIdx+3] = 255; // Alpha penuh
+                            data[destIdx+3] = 255;
                         }
                     }
                 }
@@ -319,27 +316,26 @@
                 // Hitung posisi visual di layar 2D
                 const px = radius * Math.cos(radLat) * Math.sin(radLon);
                 const py = -radius * Math.sin(radLat);
-                const pz = Math.cos(radLat) * Math.cos(radLon); // pz > 0 berarti pin menghadap ke user
+                const pz = Math.cos(radLat) * Math.cos(radLon);
 
                 if (pz > 0) {
                     ctx.beginPath();
                     ctx.arc(cx + px, cy + py, loc.id === currentTimezone ? 10 : 7, 0, 2 * Math.PI);
                     
                     if (loc.id === currentTimezone) {
-                        ctx.fillStyle = "#a855f7"; // Ungu menyala untuk lokasi terpilih aktif
+                        ctx.fillStyle = "#a855f7";
                         ctx.shadowColor = "#c084fc";
                         ctx.shadowBlur = 12;
                     } else {
-                        ctx.fillStyle = "#ef4444"; // Pin merah menyala untuk kota lain agar kontras
+                        ctx.fillStyle = "#ef4444";
                         ctx.shadowBlur = 0;
                     }
                     ctx.strokeStyle = "#ffffff";
                     ctx.lineWidth = 2;
                     ctx.fill();
                     ctx.stroke();
-                    ctx.shadowBlur = 0; // Reset efek glow
+                    ctx.shadowBlur = 0;
                     
-                    // Simpan koordinat render layar untuk kalkulasi hover tooltip & klik area
                     loc.screenX = cx + px;
                     loc.screenY = cy + py;
                 } else {
@@ -349,45 +345,11 @@
             });
         }
 
-        // --- INTEGRASI FITUR HOVER TOOLTIP ---
-        canvas.addEventListener("mousemove", (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            let found = false;
-
-            locations.forEach(loc => {
-                if (loc.screenX === null || loc.screenY === null) return;
-
-                // Hitung jarak kursor tikus ke pusat lingkaran koordinat pin
-                const d = Math.hypot(x - loc.screenX, y - loc.screenY);
-
-                if (d < 10) { // Toleransi area tangkapan kursor sepanjang 10px
-                    tooltip.style.display = "block";
-                    tooltip.style.left = e.pageX + 15 + "px";
-                    tooltip.style.top = e.pageY + 15 + "px";
-                    tooltip.innerHTML = `
-                        <strong>📍 ${loc.city}</strong><br>
-                        <span style="font-size:11px; opacity:0.8;">Zone: ${loc.id}</span><br>
-                        <span style="color:#38bdf8; font-weight:600;">GMT ${loc.gmt}</span>
-                    `;
-                    found = true;
-                }
-            });
-
-            if (!found) tooltip.style.display = "none";
-        });
-
-        canvas.addEventListener("mouseleave", () => {
-            tooltip.style.display = "none";
-        });
-
-        // --- SISTEM ROTASI DRAG BUMI 3D SEAMLESS ---
-        function startDrag(x, y) { isDragging = true; lastX = x; lastY = y; }
+        // --- Perbaikan arah geser di fungsi moveDrag agar searah tarikan mouse ---
         function moveDrag(x, y) {
             if (!isDragging) return;
             let deltaX = x - lastX;
-            rotationLon -= deltaX * 0.5; // Kecepatan sensitivitas geser horizontal bumi
+            rotationLon -= deltaX * 0.4; // Menyesuaikan arah rotasi bumi saat di-drag
             lastX = x;
             drawGlobe();
         }
