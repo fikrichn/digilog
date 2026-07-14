@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DIGILOG/title>
+    <title>RoValra Style - Fixed Hybrid Clock & Globe</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -72,7 +72,7 @@
         }
         body.night-theme .globe-shadow-overlay { border-color: #38bdf8; }
     </style>
-    <!-- Hanya butuh Core D3 Library saja (Tanpa dependency eksternal tambahan) -->
+    <!-- Core D3 Library -->
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 </head>
 <body class="day-theme">
@@ -148,10 +148,10 @@
             .clipAngle(90);
 
         const path = d3.geoPath(projection, ctx);
-        let currentRotate = [-106.8456, 6.2088]; // Kamera awal menghadap Indonesia
+        let currentRotate = [-106.8456, 6.2088]; 
         projection.rotate(currentRotate);
 
-        // --- AMBIL DATA GEOJSON ONLINE AKTIF (Natural Earth Land - Lebih Ringan & Stabil) ---
+        // Fetch data secara online langsung ke raw geojson agar terproyeksi sempurna
         fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_land.geojson')
             .then(res => res.json())
             .then(data => {
@@ -164,20 +164,20 @@
             ctx.clearRect(0, 0, 320, 320);
             const isNight = document.body.classList.contains('night-theme');
 
-            // 1. Base Air Laut (Warna abu-abu maskulin sesuai referensi)
+            // 1. Base Air Laut
             ctx.beginPath();
             ctx.arc(160, 160, radius, 0, 2 * Math.PI);
             ctx.fillStyle = isNight ? '#222d3d' : '#334155'; 
             ctx.fill();
 
-            // 2. Garis Grid Meridian
+            // 2. Grid Sferis Bumi
             ctx.beginPath();
             path({type: "Graticule"})();
             ctx.strokeStyle = isNight ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.08)';
             ctx.lineWidth = 0.8;
             ctx.stroke();
 
-            // 3. Render Gambar Batas Daratan Negara (Jika data download sudah rampung)
+            // 3. Render Batas Daratan Negara
             if (geojsonMapData) {
                 ctx.beginPath();
                 path(geojsonMapData);
@@ -198,14 +198,12 @@
                     const [x, y] = xy;
                     const isActive = (regionToTimezoneMap[reg.code] === currentTimezone);
 
-                    // Cincin Luar Berongga Ganda
                     ctx.beginPath();
                     ctx.arc(x, y, isActive ? 9 : 6, 0, 2 * Math.PI);
                     ctx.strokeStyle = isActive ? (State2.easterEggActive ? "#ef4444" : "#3b82f6") : "#ffffff";
                     ctx.lineWidth = 3;
                     ctx.stroke();
 
-                    // Titik Tengah Inti
                     ctx.beginPath();
                     ctx.arc(x, y, isActive ? 3 : 1.5, 0, 2 * Math.PI);
                     ctx.fillStyle = "#ffffff";
@@ -218,7 +216,7 @@
             });
         }
 
-        // --- EVENT POINTER DRAG CONTROLLER 360° ---
+        // --- CONTROLLER DRAG INTERACTIVE ---
         const GLOBE_DRAG_THRESHOLD = 4;
         let pointerDragged = false;
 
@@ -263,7 +261,6 @@
             }
         });
 
-        // --- SELEKSI INTERAKTIF KLIK AREA PIN ---
         canvas.addEventListener('click', (e) => {
             if (pointerDragged) return; 
             
@@ -273,10 +270,9 @@
 
             State2.regions.forEach(reg => {
                 if (reg.screenX !== null && reg.screenY !== null) {
-                    const hitDistance = Math.hypot(clickX - reg.screenX, clickY - reg.screenY);
+                    const hitDistance = Math.hypot(clickX - reg.screenX, clickY - rect.top);
                     if (hitDistance < 14) { 
                         currentTimezone = regionToTimezoneMap[reg.code];
-                        document.dispatchEvent(new CustomEvent("EVT_REGION_SELECTED", { detail: { regionCode: reg.code } }));
                         drawRovalraGlobe();
                         updateHybridClock();
                     }
@@ -284,7 +280,7 @@
             });
         });
 
-        // --- EASTER EGG (10X LOGO CLICK) ---
+        // --- EASTER EGG ---
         let clickCount = 0;
         logoTrigger.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -364,9 +360,11 @@
             drawRovalraGlobe();
         });
 
-        // Jalankan inisialisasi awal jam secara instan
-        updateHybridClock();
-        setInterval(updateHybridClock, 1000);
+        // Inisialisasi loop interval setelah dokumen selesai memuat DOM
+        window.onload = () => {
+            updateHybridClock();
+            setInterval(updateHybridClock, 1000);
+        };
     </script>
 </body>
 </html>
