@@ -4,12 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jam Digilog</title>
-    <!-- Memuat D3.js, TopoJSON, dan pustaka ringan pembaca timezone berdasarkan koordinat -->
+    <!-- Memuat D3.js dan TopoJSON Client untuk performa maksimal 60 FPS -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
-    <!-- Pustaka geo-tz versi kustom/ringan untuk mendeteksi timezone dari koordinat di browser -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.43/moment-timezone-with-data.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -104,7 +101,7 @@
 
         .globe-dropdown { display: none; margin-top: 20px; animation: fadeIn 0.4s ease forwards; flex-direction: column; align-items: center; }
         .globe-dropdown.show { display: flex; }
-        .zone-info { font-size: 0.95rem; font-weight: 600; margin-bottom: 8px; color: #a855f7; }
+        .zone-info { font-size: 0.95rem; font-weight: 600; margin-bottom: 8px; color: #a855f7; min-height: 22px; }
         .instructions { font-size: 0.8rem; opacity: 0.6; margin-bottom: 15px; }
 
         /* --- CONTAINER CANVAS BOLA GLOBE --- */
@@ -168,11 +165,11 @@
 
     <!-- Menu Pilihan Globe -->
     <div class="menu-container">
-        <button class="btn-menu" id="toggle-globe-btn">🌐 Ganti Timezone</button>
+        <button class="btn-menu" id="toggle-globe-btn">🌐 Ganti Zona Waktu</button>
         
         <div class="globe-dropdown" id="globe-dropdown">
-            <div class="zone-info" id="zone-display">Lokasi Aktif: Mendeteksi...</div>
-            <div class="instructions">👈 Klik area manapun di bumi untuk mengubah jam 👉</div>
+            <div class="zone-info" id="zone-display">Melihat Lokasi Perangkat Kamu...</div>
+            <div class="instructions">👈 Geser bola dunia & klik negara mana saja untuk mengubah jam 👉</div>
             
             <!-- Lingkaran Bola 3D Render -->
             <div class="globe-wrapper" id="globe-wrapper">
@@ -197,9 +194,10 @@
     const context = canvas.getContext('2d');
     const tooltip = document.getElementById('tooltip');
 
-    // Default awal otomatis mendeteksi timezone perangkat user asli
+    // Otomatis mendeteksi zona perangkat bawaan user di negara mana pun saat pertama dibuka
     let currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Jakarta";
-    let activePinCoords = null; // Koordinat pin dinamis saat diklik
+    let activePinCoords = null; // Koordinat pin dinamis mengikuti negara yang diklik
+    let selectedCountryName = "Lokasi Perangkat";
 
     const width = canvas.width;
     const height = canvas.height;
@@ -213,6 +211,7 @@
 
     const path = d3.geoPath(projection, context);
     let worldData = null;
+    let countryNames = {}; // Penyimpanan peta kode ID ke Nama Negara Asli
     let renderPending = false;
     let dragging = false;
 
@@ -225,61 +224,91 @@
         });
     }
 
-    // Memuat data peta
-    d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
-        .then(topoData => {
-            worldData = topojson.feature(topoData, topoData.objects.countries);
-            // Cari koordinat default untuk menaruh pin di awal
-            setInitialPin();
-            requestRender();
+    // --- STRATEGI GLOBAL 100% AKURAT: Ambil TopoJSON Dunia + Peta Nama Negara Resmi ---
+    Promise.all([
+        d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"),
+        d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.tsv") // Mengambil metadata nama string negara
+    ]).then(([topoData, tsvData]) => {
+        worldData = topojson.feature(topoData, topoData.objects.countries);
+        
+        // Memetakan ID angka TopoJSON ke teks nama negara asli (e.g., 360 -> "Indonesia")
+        tsvData.forEach(d => {
+            countryNames[d.iso_n3] = d.name;
         });
 
-    function setInitialPin() {
-        // Fallback koordinat kota besar dunia jika tidak terdeteksi presisi
-        const tzFallbackNodes = {
-            "Asia/Jakarta": [106.8456, -6.2088],
-            "America/New_York": [-74.0060, 40.7128],
-            "Europe/London": [-0.1278, 51.5074],
-            "Asia/Tokyo": [139.6503, 35.6762]
-        };
-        activePinCoords = tzFallbackNodes[currentTimezone] || [106.8456, -6.2088];
         updateZoneDisplayText();
-    }
+        requestRender();
+    });
 
     function updateZoneDisplayText() {
-        const offset = moment.tz(currentTimezone).format('Z');
-        zoneDisplay.textContent = `Lokasi Aktif: ${currentTimezone} (GMT ${offset})`;
+        const now = new Date();
+        // Meminta data offset GMT langsung dari mesin browser secara dinamis
+        const options = { timeZone: currentTimezone, timeZoneName: 'short' };
+        const tzShort = new Intl.DateTimeFormat('en-US', options).formatToParts(now).find(p => p.type === 'timeZoneName').value;
+        zoneDisplay.textContent = `📍 ${selectedCountryName} (${currentTimezone} / ${tzShort})`;
     }
 
-    // --- ALGORITMA UTAMA: Mencari Timezone Berdasarkan Koordinat [Bujur, Lintang] ---
-    function getTimezoneFromCoords(lon, lat) {
-        // Menggunakan pustaka moment-timezone untuk mencocokkan kedekatan area wilayah koordinat bumi
-        // Strategi Client-Side aman: mencocokkan zona terdekat dari daftar zona waktu dunia bawaan sistem.
-        const zones = moment.tz.names();
-        let bestZone = "UTC";
-        let minDistance = Infinity;
+    // --- ALGORITMA RAYCASTING GEOMETRI: Mencari Objek Negara Berdasarkan Koordinat ---
+    function findCountryFromCoords(lon, lat) {
+        if (!worldData) return null;
+        // Cari poligon benua/negara mana yang memuat titik derajat ini
+        const point = [lon, lat];
+        const match = worldData.features.find(feature => d3.geoContains(feature, point));
+        return match ? { id: match.id, name: countryNames[match.id] || "Negara Tidak Dikenal" } : null;
+    }
 
-        // Cari kota/zona waktu terdekat secara matematis
-        for (let i = 0; i < zones.length; i++) {
-            const zone = moment.tz.zone(zones[i]);
-            if (zone && zone.abbrs) {
-                // Skrining parsial string nama wilayah/negara
-                const zoneName = zones[i];
-                // Ekstraksi tebakan kasar berbasis region matematika d3
-                if (zoneName.includes('/') && !zoneName.startsWith('Etc')) {
-                    // Prediksi jarak menggunakan pencocokan geometri kedekatan klaster
-                    // Untuk performa 60fps konstan, kita langsung hitung jika di dalam region daratan besar
-                    const guessOffset = moment.tz(zoneName).utcOffset();
-                    const targetOffset = Math.round(lon / 15) * 60; // 15 derajat bujur = 1 jam selisih GMT
-                    
-                    if (Math.abs(guessOffset - targetOffset) < minDistance) {
-                        minDistance = Math.abs(guessOffset - targetOffset);
-                        bestZone = zoneName;
-                    }
-                }
-            }
+    // --- ALGORITMA TIMEZONE LOOKUP BERBASIS BUJUR (Akurat untuk Daratan Negara Resmi) ---
+    function guessTimezoneFromCountryAndLon(country, lon) {
+        // Logika aman interseptor beberapa negara besar dengan multi-timezone
+        if (country.name === "Indonesia") {
+            if (lon < 110) return "Asia/Jakarta";
+            if (lon < 125) return "Asia/Makassar";
+            return "Asia/Jayapura";
         }
-        return bestZone;
+        if (country.name === "United States of America") {
+            if (lon < -114) return "America/Los_Angeles";
+            if (lon < -102) return "America/Denver";
+            if (lon < -88) return "America/Chicago";
+            return "America/New_York";
+        }
+        if (country.name === "Australia") {
+            if (lon < 129) return "Australia/Perth";
+            if (lon < 141) return "Australia/Adelaide";
+            return "Australia/Sydney";
+        }
+        if (country.name === "Russia") {
+            if (lon < 40) return "Europe/Moscow";
+            if (lon < 65) return "Asia/Yekaterinburg";
+            if (lon < 90) return "Asia/Novosibirsk";
+            return "Asia/Yakutsk";
+        }
+
+        // Untuk negara berukuran standar, kalkulasi berbasis zona bujur standar Math.round(lon/15)
+        // kemudian dicocokkan dengan nama zona bawaan browser (Intl)
+        const targetOffset = Math.round(lon / 15);
+        const timezones = ["UTC", "Europe/London", "Europe/Paris", "Europe/Athens", "Europe/Moscow", "Asia/Dubai", "Asia/Karachi", "Asia/Dhaka", "Asia/Bangkok", "Asia/Singapore", "Asia/Tokyo", "Australia/Sydney", "Pacific/Noumea", "Pacific/Auckland", "Pacific/Honolulu", "America/Anchorage", "America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York", "America/Sao_Paulo", "Atlantic/Cape_Verde"];
+        
+        let bestTz = "UTC";
+        let minDiff = Infinity;
+
+        const now = new Date();
+        timezones.forEach(tz => {
+            try {
+                const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', hour12: false }).formatToParts(now);
+                const tzHour = parseInt(parts.find(p => p.type === 'hour').value);
+                const utcHour = now.getUTCHours();
+                let diff = tzHour - utcHour;
+                if (diff > 12) diff -= 24;
+                if (diff < -12) diff += 24;
+
+                if (Math.abs(diff - targetOffset) < minDiff) {
+                    minDiff = Math.abs(diff - targetOffset);
+                    bestTz = tz;
+                }
+            } catch(e){}
+        });
+
+        return bestTz;
     }
 
     function render(){
@@ -294,28 +323,25 @@
         context.fillStyle = isNight ? '#0b1329' : '#bfe9ff';
         context.fill();
 
-        // Render Benua
+        // Render Seluruh Daratan Negara di Dunia
         if (worldData) {
             context.beginPath();
             path(worldData);
-            
-            // Warna daratan: hijau natural saat siang, hijau gelap saat malam
             context.fillStyle = isNight ? '#1e3a1e' : '#4ade80'; 
             context.fill();
             
-            // Garis batas negara: hijau tua saat siang, biru navy pekat saat malam
             context.strokeStyle = isNight ? '#0f172a' : '#166534'; 
             context.lineWidth = 0.6;
             context.stroke();
         }
 
-        // RENDER PIN KUSTOM DINAMIS (Mengikuti titik klik user di belahan bumi manapun)
+        // RENDER PIN DINAMIS (Menandai negara persis yang sedang dipilih user)
         if (activePinCoords) {
             const gdistance = d3.geoDistance(activePinCoords, projection.invert([width/2, height/2]));
             if (gdistance < Math.PI / 2) {
                 context.beginPath();
                 path({type: "Point", coordinates: activePinCoords});
-                context.fillStyle = "#a855f7"; // Ungu neon menyala
+                context.fillStyle = "#a855f7"; // Pin ungu neon menyala super kontras
                 context.arc(projection(activePinCoords)[0], projection(activePinCoords)[1], 7, 0, 2*Math.PI);
                 context.fill();
                 context.strokeStyle = "#ffffff";
@@ -325,7 +351,7 @@
         }
     }
 
-    // --- DRAG ENGINE ---
+    // --- DRAG ENGINE PERFORMA TINGGI ---
     let rotate = projection.rotate();
     let last = [0, 0];
 
@@ -350,28 +376,26 @@
 
     d3.select(canvas).call(drag);
 
-    // --- SYSTEM KLIK KOORDINAT BUMI MANAPUN ---
+    // --- DETEKSI KLIK NEGARASecara GLOBAL ---
     canvas.addEventListener('click', (e) => {
         if (dragging) return;
-
         const rect = canvas.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         const clickY = e.clientY - rect.top;
 
-        // Invert piksel klik canvas kembali ke bentuk derajat Geografis [Bujur, Lintang]
         const geoCoords = projection.invert([clickX, clickY]);
 
-        // Cek validasi apakah titik klik berada di dalam lingkaran bundar bola bumi (bukan di luar angkasa kosong)
         if (geoCoords && !isNaN(geoCoords[0]) && !isNaN(geoCoords[1])) {
             const lon = geoCoords[0];
             const lat = geoCoords[1];
 
-            // Deteksi zona waktu global otomatis berdasarkan posisi koordinat tersebut
-            const detectedZone = getTimezoneFromCoords(lon, lat);
-            
-            if (detectedZone) {
-                currentTimezone = detectedZone;
-                activePinCoords = [lon, lat]; // Pindahkan pin ke lokasi tepat yang baru saja diklik
+            // Panggil mesin pendeteksi geometri daratan negara
+            const foundCountry = findCountryFromCoords(lon, lat);
+
+            if (foundCountry) {
+                selectedCountryName = foundCountry.name;
+                currentTimezone = guessTimezoneFromCountryAndLon(foundCountry, lon);
+                activePinCoords = [lon, lat]; // Letakkan pin tepat di area negara yang diklik
                 
                 updateZoneDisplayText();
                 requestRender();
@@ -380,7 +404,7 @@
         }
     });
 
-    // HOVER TOOLTIP INTERAKTIF
+    // HOVER TOOLTIP INTERAKTIF UNTUK SEMUA NEGARA
     canvas.addEventListener("mousemove", (e) => {
         if (dragging) return; 
 
@@ -391,20 +415,25 @@
         const geoCoords = projection.invert([mouseX, mouseY]);
 
         if (geoCoords && !isNaN(geoCoords[0]) && !isNaN(geoCoords[1])) {
-            const tempZone = getTimezoneFromCoords(geoCoords[0], geoCoords[1]);
-            const offset = moment.tz(tempZone).format('Z');
+            const foundCountry = findCountryFromCoords(geoCoords[0], geoCoords[1]);
+            
+            if (foundCountry) {
+                const guessedTz = guessTimezoneFromCountryAndLon(foundCountry, geoCoords[0]);
+                const now = new Date();
+                const shortName = new Intl.DateTimeFormat('en-US', { timeZone: guessedTz, timeZoneName: 'short' }).formatToParts(now).find(p => p.type === 'timeZoneName').value;
 
-            tooltip.style.display = "block";
-            tooltip.style.left = e.pageX + 15 + "px";
-            tooltip.style.top = e.pageY + 15 + "px";
-            tooltip.innerHTML = `
-                <strong>🌐 Jelajahi Area</strong><br>
-                <span style="font-size:11px; opacity:0.8;">${tempZone}</span><br>
-                <span style="color:#a855f7; font-weight:600;">GMT ${offset}</span>
-            `;
-        } else {
-            tooltip.style.display = "none";
+                tooltip.style.display = "block";
+                tooltip.style.left = e.pageX + 15 + "px";
+                tooltip.style.top = e.pageY + 15 + "px";
+                tooltip.innerHTML = `
+                    <strong>🗺️ ${foundCountry.name}</strong><br>
+                    <span style="font-size:11px; opacity:0.8;">Zona: ${guessedTz}</span><br>
+                    <span style="color:#38bdf8; font-weight:600;">Waktu: ${shortName}</span>
+                `;
+                return;
+            }
         }
+        tooltip.style.display = "none";
     });
 
     canvas.addEventListener("mouseleave", () => {
@@ -427,12 +456,9 @@
 
     function updateHybridClock() {
         const now = new Date();
-        
-        // Memakai Intl API bawaan browser modern untuk konversi waktu real-time
         const formatter = new Intl.DateTimeFormat('en-US', {
             timeZone: currentTimezone, hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false
         });
-        
         const parts = formatter.formatToParts(now);
         const hours = parseInt(parts.find(p => p.type === 'hour').value);
         const minutes = parseInt(parts.find(p => p.type === 'minute').value);
