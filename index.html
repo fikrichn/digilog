@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jam Digital X Analog - Accurate 3D Canvas Globe</title>
+    <!-- Memuat library D3.js versi 7 dan TopoJSON untuk memetakan benua peta bumi -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -113,6 +116,7 @@
         }
         .globe-wrapper:active { cursor: grabbing; }
 
+        /* Lingkaran pembatas efek bayangan 3D di atas Canvas */
         .globe-shadow-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             border-radius: 50%; pointer-events: none;
@@ -188,162 +192,173 @@
         const globeDropdown = document.getElementById('globe-dropdown');
         const zoneDisplay = document.getElementById('zone-display');
         const canvas = document.getElementById('globe-canvas');
-        const ctx = canvas.getContext('2d');
-        const globeWrapper = document.getElementById('globe-wrapper');
+        const context = canvas.getContext('2d');
         const tooltip = document.getElementById('tooltip');
 
         let currentTimezone = "Asia/Jakarta";
+        const width = canvas.width;
+        const height = canvas.height;
         
-        // --- DATA MARKER KOTA SINKRON GMT ---
+        // --- DATA GEOGRAFIS AKTIF + DATA GMT ---
         const locations = [
-            { id: "America/New_York", label: "New York", city: "New York", lat: 40.7128, lon: -74.0060, gmt: "-04:00" },
-            { id: "Europe/London", label: "London", city: "London", lat: 51.5074, lon: -0.1278, gmt: "+01:00" },
-            { id: "Asia/Jakarta", label: "Jakarta", city: "Jakarta", lat: -6.2088, lon: 106.8456, gmt: "+07:00" },
-            { id: "Asia/Makassar", label: "Makassar", city: "Makassar", lat: -5.1476, lon: 119.4327, gmt: "+08:00" },
-            { id: "Asia/Jayapura", label: "Jayapura", city: "Jayapura", lat: -2.5916, lon: 140.7178, gmt: "+09:00" },
-            { id: "Asia/Tokyo", label: "Tokyo", city: "Tokyo", lat: 35.6762, lon: 139.6503, gmt: "+09:00" }
+            { id: "America/New_York", city: "New York", lat: 40.7128, lon: -74.0060, gmt: "-04:00" },
+            { id: "Europe/London", city: "London", lat: 51.5074, lon: -0.1278, gmt: "+01:00" },
+            { id: "Asia/Jakarta", city: "Jakarta", lat: -6.2088, lon: 106.8456, gmt: "+07:00" },
+            { id: "Asia/Makassar", city: "Makassar", lat: -5.1476, lon: 119.4327, gmt: "+08:00" },
+            { id: "Asia/Jayapura", city: "Jayapura", lat: -2.5916, lon: 140.7178, gmt: "+09:00" },
+            { id: "Asia/Tokyo", city: "Tokyo", lat: 35.6762, lon: 139.6503, gmt: "+09:00" }
         ];
 
-        // --- DATA VEKTOR BENUA TINGKAT TINGGI (HIGH PRECISION JS POLYGONS) ---
-        const continents = [
-            // Asia & Eropa (Eurasia)
-            [ [70,170], [75,140], [75,100], [75,60], [70,30], [60,20], [65,0], [50,10], [40,0], [36,10], [30,33], [15,40], [13,50], [25,60], [12,75], [23,80], [10,90], [5,95], [1,103], [10,108], [15,120], [25,123], [35,120], [40,135], [55,135], [65,160] ],
-            // Afrika
-            [ [35,10], [30,30], [31,34], [25,34], [12,44], [11,51], [-4,39], [-22,48], [-34,20], [-15,12], [5,9], [15,-17], [32,-13] ],
-            // Australia
-            [ [-11,142], [-23,151], [-38,146], [-35,138], [-35,117], [-22,114], [-15,125], [-12,131] ],
-            // Kepulauan Indonesia & Filipina (Detail Akurat Skala Globe)
-            [ [5,115], [7,125], [15,121], [18,122], [14,124], [6,126], [-2,140], [-8,141], [-9,125], [-7,115], [-6,106], [5,96], [0,101], [-3,114], [2,118] ],
-            // Amerika Utara
-            [ [75,-100], [70,-165], [60,-165], [55,-130], [32,-117], [16,-93], [8,-78], [9,-75], [25,-80], [30,-81], [35,-75], [44,-64], [53,-56], [60,-65], [68,-55], [72,-74] ],
-            // Amerika Selatan
-            [ [12,-72], [7,-53], [-5,-35], [-23,-43], [-53,-71], [-45,-75], [-34,-72], [-17,-75], [-5,-81] ],
-            // Greenland
-            [ [83,-30], [75,-20], [66,-35], [60,-44], [67,-55], [76,-60], [81,-60] ],
-            // Jepang & Korea
-            [ [45,142], [40,140], [35,135], [33,130], [36,133], [38,128], [42,130], [40,125], [35,129] ]
-        ];
+        // --- 1. PROYEKSI D3 GEOGRAPHIC ORTHOGRAPHIC ---
+        const projection = d3.geoOrthographic()
+            .translate([width / 2, height / 2])
+            .scale(155)
+            .clipAngle(90)
+            .precision(0.5)
+            .rotate([-105, 5]); // Kamera awal menghadap area Indonesia/Asia
 
-        let rotationLon = 105; // Titik awal rotasi bumi (Fokus Indonesia)
-        const radius = 154;    
-        const cx = 160, cy = 160;
-        let isDragging = false;
-        let lastX = 0;
+        // --- 3. PATH RENDER ---
+        const path = d3.geoPath(projection, context);
+        let worldData = null;
 
-        function drawGlobe() {
-            ctx.clearRect(0, 0, 320, 320);
+        // Mengambil data peta topologi dunia resmi format JSON untuk D3 render benua
+        d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/world-110m.json").then(topo => {
+            worldData = topojson.feature(topo, topo.objects.countries);
+            render();
+        });
+
+        function render(){
+            context.clearRect(0, 0, width, height);
             const isNight = document.body.classList.contains('night-theme');
 
-            // 1. Gambar Dasar Air Laut
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
-            ctx.fillStyle = isNight ? '#0b1329' : '#cceeff';
-            ctx.fill();
+            // Render Air Laut / Base Sphere Globe
+            context.beginPath();
+            path({type: "Sphere"});
+            context.fillStyle = isNight ? '#0b1329' : '#bfe9ff';
+            context.fill();
 
-            // 2. Proyeksi Vektor Benua 3D Ortografis Murni
-            ctx.fillStyle = isNight ? '#254a30' : '#4caf50'; 
-            ctx.strokeStyle = isNight ? '#1e293b' : '#ffffff';
-            ctx.lineWidth = 1.2;
+            // Render Benua / Daratan Dunia jika data siap
+            if (worldData) {
+                context.beginPath();
+                path(worldData);
+                context.fillStyle = isNight ? '#22c55e' : '#4CAF50';
+                context.fill();
+                
+                // Outline garis pantai benua
+                context.strokeStyle = isNight ? '#0f172a' : '#ffffff';
+                context.lineWidth = 0.5;
+                context.stroke();
+            }
 
-            continents.forEach(poly => {
-                ctx.beginPath();
-                let first = true;
-                let lastInside = false;
-
-                poly.forEach(coord => {
-                    const lat = coord[0];
-                    const lon = coord[1];
-
-                    // RUMUS BLUEPRINT ORTHOGRAPHIC PROJECTION
-                    const phi = lat * Math.PI / 180;
-                    const theta = (lon - rotationLon) * Math.PI / 180;
-
-                    const x = radius * Math.cos(phi) * Math.sin(theta);
-                    const y = -radius * Math.sin(phi);
-                    const z = radius * Math.cos(phi) * Math.cos(theta); // Sumbu Z > 0 (Bagian Depan Bumi)
-
-                    if (z > 0) {
-                        if (first) {
-                            ctx.moveTo(cx + x, cy + y);
-                            first = false;
-                        } else {
-                            if (!lastInside) {
-                                ctx.moveTo(cx + x, cy + y);
-                            } else {
-                                ctx.lineTo(cx + x, cy + y);
-                            }
-                        }
-                        lastInside = true;
-                    } else {
-                        lastInside = false;
-                    }
-                });
-
-                if (!first) {
-                    ctx.fill();
-                    ctx.stroke();
-                }
-            });
-
-            // 3. Proyeksi Pin Kota Sesuai Sumbu Matematika Bola yang Sama
-            locations.forEach(loc => {
-                const phi = loc.lat * Math.PI / 180;
-                const theta = (loc.lon - rotationLon) * Math.PI / 180;
-
-                const px = radius * Math.cos(phi) * Math.sin(theta);
-                const py = -radius * Math.sin(phi);
-                const pz = radius * Math.cos(phi) * Math.cos(theta);
-
-                // Tampilkan hanya marker dengan z > 0 (Belahan Depan Saja)
-                if (pz > 0) {
-                    ctx.beginPath();
-                    ctx.arc(cx + px, cy + py, loc.id === currentTimezone ? 10 : 7, 0, 2 * Math.PI);
+            // --- 4. RENDER MARKER TIMEZONE OTOMATIS ---
+            locations.forEach(location => {
+                // Sembunyikan marker jika koordinat berada di sisi belakang belahan bumi (clipping)
+                const coord = [location.lon, location.lat];
+                const gdistance = d3.geoDistance(coord, projection.invert([width/2, height/2]));
+                
+                if (gdistance < Math.PI / 2) {
+                    context.beginPath();
+                    path({
+                        type: "Point",
+                        coordinates: coord
+                    });
                     
-                    if (loc.id === currentTimezone) {
-                        ctx.fillStyle = "#a855f7"; // Ungu Menyala Aktif
-                        ctx.shadowColor = "#c084fc";
-                        ctx.shadowBlur = 15;
+                    if (location.id === currentTimezone) {
+                        context.fillStyle = "#a855f7"; // Pin aktif berwarna ungu neon
+                        context.arc(projection(coord)[0], projection(coord)[1], 8, 0, 2*Math.PI);
                     } else {
-                        ctx.fillStyle = "#ef4444"; // Pin Merah
-                        ctx.shadowBlur = 0;
+                        context.fillStyle = "red"; // Pin lainnya merah biasa
                     }
-                    ctx.strokeStyle = "#ffffff";
-                    ctx.lineWidth = 2;
-                    ctx.fill();
-                    ctx.stroke();
-                    ctx.shadowBlur = 0;
-                    
-                    loc.screenX = cx + px;
-                    loc.screenY = cy + py;
-                } else {
-                    loc.screenX = null;
-                    loc.screenY = null;
+                    context.fill();
+
+                    // Stroke putih di sekeliling marker agar terlihat kontras
+                    context.strokeStyle = "#ffffff";
+                    context.lineWidth = 1.5;
+                    context.stroke();
                 }
             });
         }
 
-        // --- MOUSE TRACKER HOVER TOOLTIP ---
+        // --- 2. SISTEM DRAG / NAVIGASI D3 ROTASI 360 TANPA LIMIT ---
+        let rotate = projection.rotate();
+        let last = [0, 0];
+
+        const drag = d3.drag()
+            .on("start", (event) => {
+                last = [event.x, event.y];
+            })
+            .on("drag", (event) => {
+                // Update rotasi horizontal tanpa limit %360, serta rotasi vertikal dibatasi
+                rotate[0] += (event.x - last[0]) * 0.35;
+                rotate[1] -= (event.y - last[1]) * 0.35;
+
+                // Batasi pergerakan sudut kamera atas & bawah saja (Latitude)
+                rotate[1] = Math.max(-90, Math.min(90, rotate[1]));
+
+                projection.rotate(rotate);
+                render();
+
+                last = [event.x, event.y];
+            });
+
+        // Hubungkan event drag D3 ke canvas globe
+        d3.select(canvas).call(drag);
+
+        // --- 5. KLIK MARKER TIMEZONE ---
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            locations.forEach(location => {
+                const coord = [location.lon, location.lat];
+                // Pastikan titik berada di sisi depan belahan bumi sebelum mendeteksi klik
+                const gdistance = d3.geoDistance(coord, projection.invert([width/2, height/2]));
+                
+                if (gdistance < Math.PI / 2) {
+                    // projection(location) mengembalikan posisi [pixelX, pixelY] di canvas
+                    const pixelPos = projection(coord);
+                    if (pixelPos) {
+                        const dist = Math.hypot(clickX - pixelPos[0], clickY - pixelPos[1]);
+                        // Jangkauan deteksi klik radius 12 piksel dari pusat pin
+                        if (dist < 12) {
+                            currentTimezone = location.id;
+                            zoneDisplay.textContent = `Lokasi Aktif: ${location.id} (GMT ${location.gmt})`;
+                            render();
+                            updateHybridClock();
+                        }
+                    }
+                }
+            });
+        });
+
+        // --- SYSTEM HOVER TOOLTIP BERBASIS PROYEKSI PIXEL D3 ---
         canvas.addEventListener("mousemove", (e) => {
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
             let found = false;
 
-            locations.forEach(loc => {
-                if (loc.screenX === null || loc.screenY === null) return;
+            locations.forEach(location => {
+                const coord = [location.lon, location.lat];
+                const gdistance = d3.geoDistance(coord, projection.invert([width/2, height/2]));
 
-                const d = Math.hypot(x - loc.screenX, y - loc.screenY);
-
-                if (d < 10) { 
-                    tooltip.style.display = "block";
-                    tooltip.style.left = e.pageX + 15 + "px";
-                    tooltip.style.top = e.pageY + 15 + "px";
-                    tooltip.innerHTML = `
-                        <strong>📍 ${loc.city}</strong><br>
-                        ${loc.id}<br>
-                        GMT${loc.gmt}
-                    `;
-                    found = true;
+                if (gdistance < Math.PI / 2) {
+                    const pixelPos = projection(coord);
+                    if (pixelPos) {
+                        const dist = Math.hypot(mouseX - pixelPos[0], mouseY - pixelPos[1]);
+                        if (dist < 12) { 
+                            tooltip.style.display = "block";
+                            tooltip.style.left = e.pageX + 15 + "px";
+                            tooltip.style.top = e.pageY + 15 + "px";
+                            tooltip.innerHTML = `
+                                <strong>📍 ${location.city}</strong><br>
+                                <span style="font-size:11px; opacity:0.8;">${location.id}</span><br>
+                                <span style="color:#38bdf8; font-weight:600;">GMT ${location.gmt}</span>
+                            `;
+                            found = true;
+                        }
+                    }
                 }
             });
 
@@ -354,56 +369,7 @@
             tooltip.style.display = "none";
         });
 
-        // --- SISTEM DRAG PUTARAN 360 DERAJAT NON-LIMIT ---
-        function startDrag(x) { 
-            isDragging = true; 
-            lastX = x; 
-        }
-        
-        function moveDrag(x) {
-            if (!isDragging) return;
-            let deltaX = x - lastX;
-            
-            // Menggeser bujur kamera bumi kontinu tanpa batas batasan derajat
-            rotationLon -= deltaX * 0.4; 
-            rotationLon = (rotationLon % 360 + 360) % 360;
-            
-            lastX = x;
-            drawGlobe();
-        }
-        
-        function stopDrag() { 
-            isDragging = false; 
-        }
-
-        globeWrapper.addEventListener('mousedown', (e) => startDrag(e.pageX));
-        window.addEventListener('mousemove', (e) => moveDrag(e.pageX));
-        window.addEventListener('mouseup', stopDrag);
-
-        globeWrapper.addEventListener('touchstart', (e) => startDrag(e.touches[0].pageX));
-        window.addEventListener('touchmove', (e) => moveDrag(e.touches[0].pageX));
-        window.addEventListener('touchend', stopDrag);
-
-        // KLIK AKSI PIN LOKASI
-        canvas.addEventListener('click', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const clickY = e.clientY - rect.top;
-
-            locations.forEach(loc => {
-                if (loc.screenX !== null && loc.screenY !== null) {
-                    let dist = Math.hypot(clickX - loc.screenX, clickY - loc.screenY);
-                    if (dist < 12) {
-                        currentTimezone = loc.id;
-                        zoneDisplay.textContent = `Lokasi Aktif: ${loc.id} (GMT ${loc.gmt})`;
-                        drawGlobe();
-                        updateHybridClock();
-                    }
-                }
-            });
-        });
-
-        // --- ENGINE UNTUK JAM MEJA TABEL ---
+        // --- ENGINE SISTEM JAM HYBRID ---
         function createNumberRows(stackElement, value, count) {
             stackElement.innerHTML = '';
             for (let i = 0; i < count; i++) {
@@ -436,7 +402,7 @@
                 themeStatus.textContent = "🌙 Malam Hari";
             }
 
-            if (oldTheme !== document.body.className) { drawGlobe(); }
+            if (oldTheme !== document.body.className) { render(); }
 
             createNumberRows(hourStack, hours, 5);    
             createNumberRows(minuteStack, minutes, 5); 
@@ -459,12 +425,11 @@
 
         toggleGlobeBtn.addEventListener('click', () => {
             globeDropdown.classList.toggle('show');
-            drawGlobe();
+            render();
         });
 
         setInterval(updateHybridClock, 1000);
         updateHybridClock();
-        drawGlobe();
     </script>
 </body>
 </html>
