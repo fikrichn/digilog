@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jam Digital X Analog - Accurate 3D Canvas Globe</title>
-    <!-- Memuat library D3.js versi 7 dan TopoJSON Client dari CDN yang andal -->
+    <!-- Memuat library D3.js versi 7 -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://unpkg.com/topojson-client@3"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -215,20 +214,21 @@
             .scale(155)
             .clipAngle(90)
             .precision(0.5)
-            .rotate([-105, 5]); // Kamera menghadap Indonesia/Asia di awal
+            .rotate([-105, 5]); // Kamera awal fokus ke arah Asia/Indonesia
 
         // --- 3. PATH RENDER ---
         const path = d3.geoPath(projection, context);
         let worldData = null;
 
-        // Memuat file peta TopoJSON resmi lewat unpkg CDN (Sangat aman, stabil, dan lancar di GitHub Pages)
-        d3.json("https://unpkg.com/world-atlas@2.0.2/world/110m.json")
-            .then(topo => {
-                // Konversi struktur TopoJSON menjadi GeoJSON feature agar terbaca optimal oleh D3
-                worldData = topojson.feature(topo, topo.objects.countries);
+        // Mengambil GeoJSON resmi resolusi 1:110m (Aman & lancar diload via GitHub Pages)
+        d3.json("https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson")
+            .then(geojson => {
+                worldData = geojson;
                 render();
             })
-            .catch(err => console.error("Gagal memuat peta dunia:", err));
+            .catch(err => {
+                console.error("Gagal memuat peta dari GitHub CDN:", err);
+            });
 
         function render(){
             context.clearRect(0, 0, width, height);
@@ -240,16 +240,16 @@
             context.fillStyle = isNight ? '#0b1329' : '#bfe9ff';
             context.fill();
 
-            // Render Benua / Daratan Dunia Resmi (Detail, Indah, dan Smooth)
+            // Render Benua / Daratan Dunia asli yang mendetail
             if (worldData) {
                 context.beginPath();
                 path(worldData);
                 context.fillStyle = isNight ? '#22c55e' : '#4CAF50';
                 context.fill();
                 
-                // Outline garis pantai benua/negara
+                // Outline batas pantai benua/negara
                 context.strokeStyle = isNight ? '#0f172a' : '#ffffff';
-                context.lineWidth = 0.5;
+                context.lineWidth = 0.6;
                 context.stroke();
             }
 
@@ -258,7 +258,7 @@
                 const coord = [location.lon, location.lat];
                 const gdistance = d3.geoDistance(coord, projection.invert([width/2, height/2]));
                 
-                // Sembunyikan pin jika sedang berada di belahan bumi belakang (clipping)
+                // Sembunyikan marker jika koordinat berada di belahan bumi belakang (clipping)
                 if (gdistance < Math.PI / 2) {
                     context.beginPath();
                     path({
@@ -267,10 +267,10 @@
                     });
                     
                     if (location.id === currentTimezone) {
-                        context.fillStyle = "#a855f7"; // Marker aktif ungu bersinar
+                        context.fillStyle = "#a855f7"; // Pin aktif ungu neon bersinar
                         context.arc(projection(coord)[0], projection(coord)[1], 8, 0, 2*Math.PI);
                     } else {
-                        context.fillStyle = "red"; // Marker non-aktif merah standar
+                        context.fillStyle = "red"; // Pin standar merah
                     }
                     context.fill();
 
@@ -281,7 +281,7 @@
             });
         }
 
-        // --- 2. SISTEM DRAG NAVIGATION D3 ROTASI 360° NON-LIMIT ---
+        // --- 2. SISTEM DRAG NAVIGASI D3 ROTASI HORIZONTAL NON-LIMIT ---
         let rotate = projection.rotate();
         let last = [0, 0];
 
@@ -290,11 +290,10 @@
                 last = [event.x, event.y];
             })
             .on("drag", (event) => {
-                // Rotasi horizontal (rotate[0]) dibiarkan terus bertambah tanpa limit %360
                 rotate[0] += (event.x - last[0]) * 0.35;
                 rotate[1] -= (event.y - last[1]) * 0.35;
 
-                // Batasi latitude atas dan bawah saja agar kamera tidak jungkir balik
+                // Batasi hanya pergerakan atas bawah (latitude)
                 rotate[1] = Math.max(-90, Math.min(90, rotate[1]));
 
                 projection.rotate(rotate);
@@ -303,7 +302,7 @@
                 last = [event.x, event.y];
             });
 
-        // Sambungkan modul drag D3 langsung ke canvas globe
+        // Pasangkan modul drag D3 ke element canvas
         d3.select(canvas).call(drag);
 
         // --- 5. KLIK PIN MARKER TIMEZONE ---
@@ -317,7 +316,7 @@
                 const gdistance = d3.geoDistance(coord, projection.invert([width/2, height/2]));
                 
                 if (gdistance < Math.PI / 2) {
-                    // projection(location) memetakan titik koordinat bumi menjadi posisi piksel canvas
+                    // projection memperoleh koordinat pixel presisi [X, Y] dari data lokasi
                     const pixelPos = projection(coord);
                     if (pixelPos) {
                         const dist = Math.hypot(clickX - pixelPos[0], clickY - pixelPos[1]);
@@ -332,7 +331,7 @@
             });
         });
 
-        // --- SYSTEM HOVER TOOLTIP BERBASIS PIXEL PROYEKSI ---
+        // --- SYSTEM HOVER TOOLTIP AKURAT ---
         canvas.addEventListener("mousemove", (e) => {
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
@@ -369,7 +368,7 @@
             tooltip.style.display = "none";
         });
 
-        // --- ENGINE SISTEM JAM DIGITAL HYBRID ---
+        // --- ENGINE KONTROL JAM HYBRID ---
         function createNumberRows(stackElement, value, count) {
             stackElement.innerHTML = '';
             for (let i = 0; i < count; i++) {
