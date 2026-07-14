@@ -194,33 +194,37 @@
 
         let currentTimezone = "Asia/Jakarta";
         
+        // --- DATA MARKER KOTA SINKRON GMT ---
         const locations = [
-            { id: "America/New_York", city: "New York", lat: 40.7128, lon: -74.0060, gmt: "-04:00" },
-            { id: "Europe/London", city: "London", lat: 51.5074, lon: -0.1278, gmt: "+01:00" },
-            { id: "Asia/Jakarta", city: "Jakarta", lat: -6.2088, lon: 106.8456, gmt: "+07:00" },
-            { id: "Asia/Makassar", city: "Makassar", lat: -5.1476, lon: 119.4327, gmt: "+08:00" },
-            { id: "Asia/Jayapura", city: "Jayapura", lat: -2.5916, lon: 140.7178, gmt: "+09:00" },
-            { id: "Asia/Tokyo", city: "Tokyo", lat: 35.6762, lon: 139.6503, gmt: "+09:00" }
+            { id: "America/New_York", label: "New York", city: "New York", lat: 40.7128, lon: -74.0060, gmt: "-04:00" },
+            { id: "Europe/London", label: "London", city: "London", lat: 51.5074, lon: -0.1278, gmt: "+01:00" },
+            { id: "Asia/Jakarta", label: "Jakarta", city: "Jakarta", lat: -6.2088, lon: 106.8456, gmt: "+07:00" },
+            { id: "Asia/Makassar", label: "Makassar", city: "Makassar", lat: -5.1476, lon: 119.4327, gmt: "+08:00" },
+            { id: "Asia/Jayapura", label: "Jayapura", city: "Jayapura", lat: -2.5916, lon: 140.7178, gmt: "+09:00" },
+            { id: "Asia/Tokyo", label: "Tokyo", city: "Tokyo", lat: 35.6762, lon: 139.6503, gmt: "+09:00" }
         ];
 
-        // --- DATA VEKTOR BENUA JS MURNI ---
-        // Koordinat poligon kasar benua bumi [lintang, bujur] untuk di-render matematis secara real-time
+        // --- DATA VEKTOR BENUA TINGKAT TINGGI (HIGH PRECISION JS POLYGONS) ---
         const continents = [
-            // Asia & Eropa (Eurasia) + Afrika
-            [ [65,170], [70,100], [75,60], [70,20], [60,0], [45,-10], [35,-5], [30,30], [15,40], [12,15], [35,10], [30,-15], [5,-10], [-30,20], [-34,20], [0,40], [12,45], [25,60], [10,75], [20,80], [10,90], [5,100], [1,103], [10,108], [20,110], [35,120], [40,130], [55,140], [60,165] ],
+            // Asia & Eropa (Eurasia)
+            [ [70,170], [75,140], [75,100], [75,60], [70,30], [60,20], [65,0], [50,10], [40,0], [36,10], [30,33], [15,40], [13,50], [25,60], [12,75], [23,80], [10,90], [5,95], [1,103], [10,108], [15,120], [25,123], [35,120], [40,135], [55,135], [65,160] ],
+            // Afrika
+            [ [35,10], [30,30], [31,34], [25,34], [12,44], [11,51], [-4,39], [-22,48], [-34,20], [-15,12], [5,9], [15,-17], [32,-13] ],
             // Australia
-            [ [-22,114], [-35,115], [-35,138], [-38,145], [-28,153], [-10,142], [-12,131], [-20,115] ],
-            // Nusantara / Kepulauan Indonesia (Sederhana untuk skala visual)
-            [ [-5,105], [-6,115], [-8,125], [-8,140], [-2,140], [-1,130], [1,120], [4,115], [5,110], [0,100] ],
+            [ [-11,142], [-23,151], [-38,146], [-35,138], [-35,117], [-22,114], [-15,125], [-12,131] ],
+            // Kepulauan Indonesia & Filipina (Detail Akurat Skala Globe)
+            [ [5,115], [7,125], [15,121], [18,122], [14,124], [6,126], [-2,140], [-8,141], [-9,125], [-7,115], [-6,106], [5,96], [0,101], [-3,114], [2,118] ],
             // Amerika Utara
-            [ [75,-100], [70,-160], [60,-165], [65,-150], [55,-130], [30,-115], [20,-105], [15,-90], [10,-75], [25,-80], [30,-80], [40,-74], [50,-55], [60,-60], [70,-70] ],
+            [ [75,-100], [70,-165], [60,-165], [55,-130], [32,-117], [16,-93], [8,-78], [9,-75], [25,-80], [30,-81], [35,-75], [44,-64], [53,-56], [60,-65], [68,-55], [72,-74] ],
             // Amerika Selatan
-            [ [12,-72], [5,-75], [-5,-80], [-12,-77], [-35,-73], [-53,-70], [-50,-50], [-23,-43], [-5,-35], [5,-50], [10,-60] ],
+            [ [12,-72], [7,-53], [-5,-35], [-23,-43], [-53,-71], [-45,-75], [-34,-72], [-17,-75], [-5,-81] ],
             // Greenland
-            [ [80,-60], [70,-50], [60,-45], [65,-30], [75,-20], [83,-30] ]
+            [ [83,-30], [75,-20], [66,-35], [60,-44], [67,-55], [76,-60], [81,-60] ],
+            // Jepang & Korea
+            [ [45,142], [40,140], [35,135], [33,130], [36,133], [38,128], [42,130], [40,125], [35,129] ]
         ];
 
-        let rotationLon = 105; // Fokus kamera awal (Indonesia)
+        let rotationLon = 105; // Titik awal rotasi bumi (Fokus Indonesia)
         const radius = 154;    
         const cx = 160, cy = 160;
         let isDragging = false;
@@ -230,60 +234,67 @@
             ctx.clearRect(0, 0, 320, 320);
             const isNight = document.body.classList.contains('night-theme');
 
-            // 1. Render Background Air Laut
+            // 1. Gambar Dasar Air Laut
             ctx.beginPath();
             ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
             ctx.fillStyle = isNight ? '#0b1329' : '#cceeff';
             ctx.fill();
 
-            // 2. Render Benua Vektor Menggunakan Kalkulasi 3D Ortografis JS
-            ctx.fillStyle = isNight ? '#2a4d34' : '#4caf50'; // Warna benua anti-alias vector
-            ctx.strokeStyle = isNight ? '#38bdf8' : '#ffffff';
-            ctx.lineWidth = 1;
+            // 2. Proyeksi Vektor Benua 3D Ortografis Murni
+            ctx.fillStyle = isNight ? '#254a30' : '#4caf50'; 
+            ctx.strokeStyle = isNight ? '#1e293b' : '#ffffff';
+            ctx.lineWidth = 1.2;
 
             continents.forEach(poly => {
                 ctx.beginPath();
                 let first = true;
+                let lastInside = false;
 
                 poly.forEach(coord => {
                     const lat = coord[0];
                     const lon = coord[1];
 
-                    const radLat = lat * Math.PI / 180;
-                    // Rumus perputaran 360 derajat non-limit murni tanpa batas media luar
-                    const radLon = (lon - rotationLon) * Math.PI / 180;
+                    // RUMUS BLUEPRINT ORTHOGRAPHIC PROJECTION
+                    const phi = lat * Math.PI / 180;
+                    const theta = (lon - rotationLon) * Math.PI / 180;
 
-                    // Hitung proyeksi koordinat sferis ke bidang datar 2D
-                    const x = radius * Math.cos(radLat) * Math.sin(radLon);
-                    const y = -radius * Math.sin(radLat);
-                    const z = Math.cos(radLat) * Math.cos(radLon); // z > 0 berarti berada di belahan bumi depan
+                    const x = radius * Math.cos(phi) * Math.sin(theta);
+                    const y = -radius * Math.sin(phi);
+                    const z = radius * Math.cos(phi) * Math.cos(theta); // Sumbu Z > 0 (Bagian Depan Bumi)
 
                     if (z > 0) {
                         if (first) {
                             ctx.moveTo(cx + x, cy + y);
                             first = false;
                         } else {
-                            ctx.lineTo(cx + x, cy + y);
+                            if (!lastInside) {
+                                ctx.moveTo(cx + x, cy + y);
+                            } else {
+                                ctx.lineTo(cx + x, cy + y);
+                            }
                         }
+                        lastInside = true;
+                    } else {
+                        lastInside = false;
                     }
                 });
 
                 if (!first) {
-                    ctx.closePath();
                     ctx.fill();
                     ctx.stroke();
                 }
             });
 
-            // 3. Render Pin Lokasi Sinkron Berbasis Sumbu Matematika Yang Sama
+            // 3. Proyeksi Pin Kota Sesuai Sumbu Matematika Bola yang Sama
             locations.forEach(loc => {
-                const radLat = loc.lat * Math.PI / 180;
-                const radLon = (loc.lon - rotationLon) * Math.PI / 180;
+                const phi = loc.lat * Math.PI / 180;
+                const theta = (loc.lon - rotationLon) * Math.PI / 180;
 
-                const px = radius * Math.cos(radLat) * Math.sin(radLon);
-                const py = -radius * Math.sin(radLat);
-                const pz = Math.cos(radLat) * Math.cos(radLon);
+                const px = radius * Math.cos(phi) * Math.sin(theta);
+                const py = -radius * Math.sin(phi);
+                const pz = radius * Math.cos(phi) * Math.cos(theta);
 
+                // Tampilkan hanya marker dengan z > 0 (Belahan Depan Saja)
                 if (pz > 0) {
                     ctx.beginPath();
                     ctx.arc(cx + px, cy + py, loc.id === currentTimezone ? 10 : 7, 0, 2 * Math.PI);
@@ -293,16 +304,15 @@
                         ctx.shadowColor = "#c084fc";
                         ctx.shadowBlur = 15;
                     } else {
-                        ctx.fillStyle = "#ef4444"; // Merah Akurat
+                        ctx.fillStyle = "#ef4444"; // Pin Merah
                         ctx.shadowBlur = 0;
                     }
                     ctx.strokeStyle = "#ffffff";
                     ctx.lineWidth = 2;
                     ctx.fill();
                     ctx.stroke();
-                    ctx.shadowBlur = 0; // Reset blur
+                    ctx.shadowBlur = 0;
                     
-                    // Kunci koordinat render di layar untuk hover & click detector
                     loc.screenX = cx + px;
                     loc.screenY = cy + py;
                 } else {
@@ -312,7 +322,7 @@
             });
         }
 
-        // --- SISTEM TRACKER HOVER TOOLTIP ---
+        // --- MOUSE TRACKER HOVER TOOLTIP ---
         canvas.addEventListener("mousemove", (e) => {
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
@@ -324,14 +334,14 @@
 
                 const d = Math.hypot(x - loc.screenX, y - loc.screenY);
 
-                if (d < 12) { 
+                if (d < 10) { 
                     tooltip.style.display = "block";
                     tooltip.style.left = e.pageX + 15 + "px";
                     tooltip.style.top = e.pageY + 15 + "px";
                     tooltip.innerHTML = `
                         <strong>📍 ${loc.city}</strong><br>
-                        <span style="font-size:11px; opacity:0.8;">${loc.id}</span><br>
-                        <span style="color:#38bdf8; font-weight:600;">GMT ${loc.gmt}</span>
+                        ${loc.id}<br>
+                        GMT${loc.gmt}
                     `;
                     found = true;
                 }
@@ -344,7 +354,7 @@
             tooltip.style.display = "none";
         });
 
-        // --- INTERAKSI GULIR/DRAG BUMI 360 DERAJAT NON-LIMIT ---
+        // --- SISTEM DRAG PUTARAN 360 DERAJAT NON-LIMIT ---
         function startDrag(x) { 
             isDragging = true; 
             lastX = x; 
@@ -354,10 +364,8 @@
             if (!isDragging) return;
             let deltaX = x - lastX;
             
-            // Pengurangan agar putaran bola presisi dan sinkron searah tarikan jari/kursor
+            // Menggeser bujur kamera bumi kontinu tanpa batas batasan derajat
             rotationLon -= deltaX * 0.4; 
-            
-            // Penguncian matematis looping 360 derajat tak terbatas
             rotationLon = (rotationLon % 360 + 360) % 360;
             
             lastX = x;
@@ -376,7 +384,7 @@
         window.addEventListener('touchmove', (e) => moveDrag(e.touches[0].pageX));
         window.addEventListener('touchend', stopDrag);
 
-        // TRIGGER KLIK PIN LOKASI AKTIF
+        // KLIK AKSI PIN LOKASI
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
@@ -395,7 +403,7 @@
             });
         });
 
-        // --- ENGINE UTAMA JAM DIGITAL X ANALOG ---
+        // --- ENGINE UNTUK JAM MEJA TABEL ---
         function createNumberRows(stackElement, value, count) {
             stackElement.innerHTML = '';
             for (let i = 0; i < count; i++) {
@@ -454,7 +462,6 @@
             drawGlobe();
         });
 
-        // Initialize murni dari tools JS
         setInterval(updateHybridClock, 1000);
         updateHybridClock();
         drawGlobe();
